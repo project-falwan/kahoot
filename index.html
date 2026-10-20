@@ -1,0 +1,1688 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kahoot! Interactive Quiz & Real-Time Presence</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Montserrat & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #250756;
+      overflow-x: hidden;
+    }
+    .font-kahoot {
+      font-family: 'Montserrat', sans-serif;
+    }
+
+    /* Kahoot Geometric Shape Buttons */
+    .btn-kahoot-red { background-color: #e21b3c; }
+    .btn-kahoot-red:hover { background-color: #c01431; }
+    
+    .btn-kahoot-blue { background-color: #1368ce; }
+    .btn-kahoot-blue:hover { background-color: #0f52a5; }
+    
+    .btn-kahoot-yellow { background-color: #d89e00; }
+    .btn-kahoot-yellow:hover { background-color: #b58400; }
+    
+    .btn-kahoot-green { background-color: #26890c; }
+    .btn-kahoot-green:hover { background-color: #1e6d09; }
+
+    /* Continuous Hop animation for Student Avatars in Lobby */
+    @keyframes kahootContinuousHop {
+      0%, 100% {
+        transform: translateY(0) scale(1) rotate(0deg);
+      }
+      30% {
+        transform: translateY(calc(var(--jump-height, -24px) * 0.3)) scaleX(1.08) scaleY(0.92) rotate(calc(var(--wiggle-deg, -4deg) * 0.5));
+      }
+      50% {
+        transform: translateY(var(--jump-height, -24px)) scaleX(0.92) scaleY(1.08) rotate(var(--wiggle-deg, -4deg));
+      }
+      70% {
+        transform: translateY(calc(var(--jump-height, -24px) * 0.2)) scaleX(1.04) scaleY(0.96) rotate(calc(var(--wiggle-deg, -4deg) * -0.5));
+      }
+      85% {
+        transform: translateY(0) scaleX(1.1) scaleY(0.88) rotate(0deg);
+      }
+    }
+
+    @keyframes partySuperHop {
+      0%, 100% { transform: translateY(0) scale(1) rotate(0deg); }
+      25% { transform: translateY(-28px) scale(1.1) rotate(-8deg); }
+      50% { transform: translateY(-6px) scale(0.95) rotate(4deg); }
+      75% { transform: translateY(-32px) scale(1.12) rotate(10deg); }
+    }
+
+    @keyframes avatarPopIn {
+      0% { transform: scale(0) rotate(-25deg); opacity: 0; }
+      70% { transform: scale(1.25) rotate(6deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+
+    @keyframes spotlightGlow {
+      0%, 100% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.7), 0 0 40px rgba(236, 72, 153, 0.4); }
+      50% { box-shadow: 0 0 35px rgba(251, 191, 36, 1), 0 0 60px rgba(236, 72, 153, 0.8); }
+    }
+
+    @keyframes floatOrb {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(30px, -40px) scale(1.15); }
+    }
+
+    /* Podium rise animation */
+    @keyframes podiumRise {
+      0% { transform: translateY(100%); opacity: 0; }
+      100% { transform: translateY(0); opacity: 1; }
+    }
+
+    .animate-pop-in {
+      animation: avatarPopIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    .avatar-hopping-card {
+      animation: kahootContinuousHop var(--bounce-duration, 1.8s) cubic-bezier(0.28, 0.84, 0.42, 1) infinite;
+      animation-delay: var(--bounce-delay, 0s);
+      will-change: transform;
+    }
+
+    .party-active .avatar-hopping-card {
+      animation: partySuperHop 0.85s cubic-bezier(0.175, 0.885, 0.32, 1.275) infinite !important;
+      animation-delay: calc(var(--bounce-delay, 0s) * 0.4) !important;
+    }
+
+    .spotlight-card {
+      animation-name: kahootContinuousHop, spotlightGlow;
+      animation-duration: var(--bounce-duration, 1.8s), 1.5s;
+      animation-iteration-count: infinite, infinite;
+      z-index: 30 !important;
+    }
+
+    .podium-anim {
+      animation: podiumRise 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    .bg-orb-1 { animation: floatOrb 12s ease-in-out infinite; }
+    .bg-orb-2 { animation: floatOrb 16s ease-in-out infinite reverse; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.25); border-radius: 99px; }
+  </style>
+</head>
+<body class="text-white min-h-screen flex flex-col antialiased selection:bg-fuchsia-500 selection:text-white bg-gradient-to-br from-[#3b0764] via-[#250756] to-[#13032d] relative">
+
+  <!-- BACKGROUND AMBIENT PARTICLES -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+    <div class="absolute -top-20 -left-20 w-96 h-96 bg-fuchsia-600/20 rounded-full blur-3xl bg-orb-1"></div>
+    <div class="absolute top-1/3 -right-20 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl bg-orb-2"></div>
+    <div class="absolute -bottom-20 left-1/3 w-96 h-96 bg-amber-500/15 rounded-full blur-3xl bg-orb-1"></div>
+  </div>
+
+  <!-- CONFETTI CANVAS OVERLAY -->
+  <canvas id="confettiCanvas" class="fixed inset-0 pointer-events-none z-50 w-full h-full"></canvas>
+
+  <!-- APP NAVBAR -->
+  <header class="bg-black/40 backdrop-blur-md border-b border-white/10 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        
+        <!-- App Title -->
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-400 via-fuchsia-500 to-indigo-500 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-fuchsia-500/30 font-kahoot animate-bounce">
+            K!
+          </div>
+          <div>
+            <h1 class="font-black text-lg text-white font-kahoot tracking-wide leading-none flex items-center gap-2">
+              Kahoot! Quiz <span id="gamePhaseBadge" class="text-xs font-normal text-amber-300 bg-amber-400/20 border border-amber-400/30 px-2.5 py-0.5 rounded-full hidden sm:inline-block">Lobby Presensi 🟢</span>
+            </h1>
+            <p class="text-[11px] text-fuchsia-200/80 font-medium hidden md:block">Absensi + Kuis Interaktif Real-Time</p>
+          </div>
+        </div>
+
+        <!-- Role Navigation Tabs -->
+        <div class="flex items-center bg-white/10 p-1 rounded-xl backdrop-blur-md border border-white/10 text-xs font-bold font-kahoot">
+          <button id="tabLecturer" onclick="switchRole('lecturer')" class="px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-white bg-fuchsia-600 shadow-md">
+            <span>📺 Layar Dosen</span>
+          </button>
+          <button id="tabStudent" onclick="switchRole('student')" class="px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-slate-300 hover:text-white">
+            <span>📱 Layar Mahasiswa</span>
+          </button>
+          <button id="tabDemo" onclick="switchRole('demo')" class="px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-slate-300 hover:text-white hidden sm:flex">
+            <span>⚡ Dual View</span>
+          </button>
+        </div>
+
+        <!-- Audio & Sync Indicator -->
+        <div class="flex items-center space-x-2">
+          <button id="soundToggleBtn" onclick="toggleAudio()" class="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-all flex items-center gap-1.5 text-xs font-semibold" title="Toggle Sound FX">
+            <span id="soundIcon">🔊</span>
+            <span id="soundLabel" class="hidden md:inline text-[11px]">Suara On</span>
+          </button>
+          <div class="hidden sm:flex items-center gap-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full text-[11px] font-bold font-mono">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span id="syncStatus">Connected</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+
+  <!-- MAIN CONTAINER AREA -->
+  <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col justify-center z-10 relative">
+
+    <!-- 1. LECTURER / HOST VIEW -->
+    <div id="viewLecturer" class="w-full space-y-6">
+
+      <!-- TOP CONTROL BAR FOR HOST -->
+      <div id="lecturerTopBar" class="bg-black/40 backdrop-blur-xl border border-white/15 rounded-3xl p-4 sm:p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-2xl">
+        
+        <!-- Game Room PIN Box -->
+        <div class="flex items-center gap-4 bg-white/10 px-6 py-3 rounded-2xl border border-white/20 w-full md:w-auto justify-between md:justify-start">
+          <div>
+            <span class="text-[11px] font-bold text-fuchsia-300 uppercase tracking-wider block">PIN Game / Kuis:</span>
+            <div class="flex items-center gap-2">
+              <span id="roomPinDisplay" class="text-3xl sm:text-4xl font-black font-kahoot text-amber-300 tracking-widest">778-902</span>
+              <button onclick="copyRoomPIN()" class="p-1.5 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition" title="Salin PIN">
+                📋
+              </button>
+            </div>
+          </div>
+          <div class="h-10 w-px bg-white/20 hidden sm:block"></div>
+          <div class="text-right sm:text-left">
+            <span class="text-[11px] font-bold text-slate-300 block">Total Peserta</span>
+            <span id="playerCounter" class="text-2xl font-black font-kahoot text-amber-300">0</span>
+          </div>
+        </div>
+
+        <!-- Quiz Progress Banner or Controls -->
+        <div id="hostQuizStatus" class="flex items-center gap-3 bg-fuchsia-950/70 border border-fuchsia-500/30 px-6 py-3 rounded-2xl">
+          <div class="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center text-xl font-black font-kahoot shadow-lg">
+            ❓
+          </div>
+          <div>
+            <span id="quizProgressText" class="text-lg font-black font-kahoot text-white leading-none">Bank Soal: 3 Soal Ready</span>
+            <span id="quizStatusSub" class="text-xs font-bold text-fuchsia-200 block">Siap Mulai Kuis Kapan Saja</span>
+          </div>
+        </div>
+
+        <!-- Host Actions Button Group -->
+        <div class="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
+          <button id="partyModeBtn" onclick="togglePartyMode()" class="px-3.5 py-2.5 bg-gradient-to-r from-fuchsia-500 to-rose-500 hover:from-fuchsia-400 hover:to-rose-400 text-white font-black font-kahoot text-xs rounded-xl transition shadow-lg shadow-fuchsia-500/30 active:scale-95">
+            🎉 Party
+          </button>
+
+          <button onclick="simulateStudentJoin()" class="px-3 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black font-kahoot text-xs rounded-xl transition shadow-lg shadow-amber-500/20 active:scale-95">
+            ⚡ +Simulasi Bot
+          </button>
+
+          <button id="mainHostBtn" onclick="handleHostMainAction()" class="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black font-kahoot text-xs rounded-xl transition shadow-lg shadow-emerald-500/30 active:scale-95 flex items-center gap-2">
+            🚀 Mulai Kuis Kahoot!
+          </button>
+
+          <button onclick="openQuestionManagerModal()" class="px-3 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition" title="Kelola Soal">
+            ⚙️ Bank Soal
+          </button>
+
+          <button onclick="openResetModal()" class="px-3 py-2.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 font-bold text-xs rounded-xl transition active:scale-95" title="Reset Room">
+            🗑️
+          </button>
+        </div>
+
+      </div>
+
+
+      <!-- LECTURER STAGE CONTENT AREA (DYNAMIC PHASES) -->
+      <div id="lecturerStageContainer" class="bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-10 min-h-[480px] flex flex-col justify-between relative overflow-hidden shadow-2xl transition-all">
+        
+        <!-- PHASE A: LOBBY STAGE (BOUNCING AVATARS) -->
+        <div id="hostLobbyPhase" class="space-y-6">
+          <div class="text-center space-y-1.5 z-10">
+            <h2 class="text-2xl sm:text-3xl font-black font-kahoot text-white tracking-wide">
+              Masuk ke Lobby Presensi & Kuis!
+            </h2>
+            <p class="text-xs sm:text-sm text-fuchsia-200 font-medium">
+              Gunakan HP Anda & masukkan PIN <span class="font-bold text-amber-300 font-mono text-base px-2 py-0.5 rounded-md bg-white/10">778-902</span>
+            </p>
+          </div>
+
+          <!-- Bouncing Avatar Grid -->
+          <div id="lobbyStageGrid" class="pt-10 pb-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-6 z-10 max-h-[460px] overflow-y-auto px-2">
+            <div id="lobbyEmptyState" class="col-span-full text-center py-16 space-y-4">
+              <div class="text-6xl animate-bounce">📱</div>
+              <p class="text-slate-200 text-base font-bold font-kahoot">Lobby Masih Kosong</p>
+              <p class="text-xs text-fuchsia-300 max-w-md mx-auto">
+                Mahasiswa yang masuk akan langsung <span class="text-amber-300 font-bold">melompat gembira</span> di layar ini! Klik <span class="text-amber-300 font-bold">⚡ +Simulasi Bot</span> untuk mencoba.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- PHASE B: ACTIVE QUESTION STAGE (QUESTION, TIMER & ANSWER OPTIONS) -->
+        <div id="hostQuestionPhase" class="hidden space-y-8 my-auto">
+          
+          <!-- Question Header & Timer Bar -->
+          <div class="flex items-center justify-between gap-4">
+            <span id="questionNumberBadge" class="px-4 py-2 bg-indigo-600/80 rounded-2xl text-xs font-black font-kahoot tracking-wider text-amber-300 border border-indigo-400/40">
+              SOAL 1 dari 3
+            </span>
+            
+            <!-- Countdown Timer Circle/Box -->
+            <div class="flex items-center gap-3 bg-amber-400 text-slate-950 px-6 py-2.5 rounded-2xl font-black font-kahoot text-2xl shadow-lg shadow-amber-400/30 animate-pulse">
+              ⏱️ <span id="questionTimerDisplay">20</span>s
+            </div>
+
+            <!-- Answers Submitted Counter -->
+            <div class="px-4 py-2 bg-fuchsia-600/80 rounded-2xl text-xs font-black font-kahoot text-white border border-fuchsia-400/40">
+              <span id="submittedCount">0</span> / <span id="totalStudentsCount">0</span> Jawaban
+            </div>
+          </div>
+
+          <!-- Big Question Title Box -->
+          <div class="bg-slate-900/90 border-2 border-white/20 rounded-3xl p-8 text-center shadow-2xl relative overflow-hidden">
+            <h2 id="hostQuestionTitle" class="text-2xl sm:text-4xl font-black font-kahoot text-white leading-tight">
+              Bahasa Pemrograman apa yang digunakan untuk membuat logika interaktif di browser web?
+            </h2>
+          </div>
+
+          <!-- 4 Kahoot Options Display Grid for Host View -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="btn-kahoot-red rounded-2xl p-5 flex items-center gap-4 text-white font-black font-kahoot text-lg shadow-lg">
+              <span class="text-2xl">🔺</span>
+              <span id="hostOpt0">A. Python</span>
+            </div>
+            <div class="btn-kahoot-blue rounded-2xl p-5 flex items-center gap-4 text-white font-black font-kahoot text-lg shadow-lg">
+              <span class="text-2xl">🔷</span>
+              <span id="hostOpt1">B. JavaScript</span>
+            </div>
+            <div class="btn-kahoot-yellow rounded-2xl p-5 flex items-center gap-4 text-white font-black font-kahoot text-lg shadow-lg">
+              <span class="text-2xl">🟡</span>
+              <span id="hostOpt2">C. C++</span>
+            </div>
+            <div class="btn-kahoot-green rounded-2xl p-5 flex items-center gap-4 text-white font-black font-kahoot text-lg shadow-lg">
+              <span class="text-2xl">🟩</span>
+              <span id="hostOpt3">D. HTML</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- PHASE C: QUESTION RESULT & CLASS STATS STAGE -->
+        <div id="hostResultPhase" class="hidden space-y-6 my-auto">
+          <div class="text-center space-y-2">
+            <span class="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-xs font-bold font-mono">
+              ✓ Waktu Habis! Hasil Jawaban Kelas
+            </span>
+            <h3 id="resultQuestionTitle" class="text-xl sm:text-2xl font-black font-kahoot text-white">
+              Bahasa Pemrograman apa...
+            </h3>
+          </div>
+
+          <!-- Answer Distribution Bars -->
+          <div class="grid grid-cols-4 gap-4 items-end h-56 pt-8 pb-2 px-6 bg-slate-900/60 rounded-3xl border border-white/10">
+            
+            <!-- Red Bar -->
+            <div class="flex flex-col items-center gap-2 h-full justify-end">
+              <span id="countBar0" class="text-sm font-black font-kahoot text-rose-300">0</span>
+              <div id="barVisual0" class="w-full btn-kahoot-red rounded-t-xl transition-all duration-700 min-h-[12px]" style="height: 10%;"></div>
+              <span class="text-xl">🔺</span>
+            </div>
+
+            <!-- Blue Bar -->
+            <div class="flex flex-col items-center gap-2 h-full justify-end">
+              <span id="countBar1" class="text-sm font-black font-kahoot text-blue-300">0</span>
+              <div id="barVisual1" class="w-full btn-kahoot-blue rounded-t-xl transition-all duration-700 min-h-[12px]" style="height: 80%;"></div>
+              <span class="text-xl">🔷</span>
+            </div>
+
+            <!-- Yellow Bar -->
+            <div class="flex flex-col items-center gap-2 h-full justify-end">
+              <span id="countBar2" class="text-sm font-black font-kahoot text-amber-300">0</span>
+              <div id="barVisual2" class="w-full btn-kahoot-yellow rounded-t-xl transition-all duration-700 min-h-[12px]" style="height: 5%;"></div>
+              <span class="text-xl">🟡</span>
+            </div>
+
+            <!-- Green Bar -->
+            <div class="flex flex-col items-center gap-2 h-full justify-end">
+              <span id="countBar3" class="text-sm font-black font-kahoot text-emerald-300">0</span>
+              <div id="barVisual3" class="w-full btn-kahoot-green rounded-t-xl transition-all duration-700 min-h-[12px]" style="height: 5%;"></div>
+              <span class="text-xl">🟩</span>
+            </div>
+
+          </div>
+
+          <!-- Correct Answer Banner -->
+          <div class="bg-emerald-500/20 border border-emerald-500/40 rounded-2xl p-4 text-center">
+            <p class="text-xs font-bold text-emerald-300 uppercase tracking-wide">Jawaban Benar:</p>
+            <p id="correctAnswerText" class="text-xl font-black font-kahoot text-white mt-0.5">
+              🔷 B. JavaScript
+            </p>
+          </div>
+        </div>
+
+        <!-- PHASE D: LEADERBOARD BOARD STAGE -->
+        <div id="hostLeaderboardPhase" class="hidden space-y-6 my-auto">
+          <div class="text-center space-y-1">
+            <h2 class="text-3xl font-black font-kahoot text-amber-300">🏆 Papan Skor Sementara</h2>
+            <p class="text-xs text-fuchsia-200">Diurutkan berdasarkan Ketepatan & Kecepatan Menjawab</p>
+          </div>
+
+          <!-- Leaderboard List -->
+          <div id="leaderboardList" class="space-y-3 max-w-2xl mx-auto w-full">
+            <!-- Dynamically populated rank cards -->
+          </div>
+        </div>
+
+        <!-- PHASE E: FINAL PODIUM STAGE (WINNERS 1, 2, 3) -->
+        <div id="hostPodiumPhase" class="hidden space-y-8 my-auto">
+          <div class="text-center space-y-2">
+            <span class="px-4 py-1.5 bg-amber-400 text-slate-950 font-black font-kahoot rounded-full text-xs shadow-lg animate-bounce inline-block">
+              🎉 KUIS SELESAI!
+            </span>
+            <h2 class="text-4xl font-black font-kahoot text-white">PODIUM JUARA</h2>
+          </div>
+
+          <!-- 3D Podium Graphic -->
+          <div class="flex items-end justify-center gap-3 sm:gap-6 pt-10 pb-4 max-w-2xl mx-auto min-h-[280px]">
+            
+            <!-- JUARA 2 (Silver) -->
+            <div class="flex-1 flex flex-col items-center podium-anim" style="animation-delay: 0.3s;">
+              <div class="w-16 h-16 rounded-2xl bg-slate-300 text-slate-900 flex items-center justify-center text-3xl font-black shadow-xl mb-2">
+                <span id="p2Avatar">🥈</span>
+              </div>
+              <span id="p2Name" class="text-xs font-black font-kahoot text-white truncate max-w-[90px]">Player 2</span>
+              <span id="p2Score" class="text-[11px] font-mono text-amber-300 font-bold mb-2">1,800 pts</span>
+              <div class="w-full bg-gradient-to-t from-slate-500 to-slate-400 h-36 rounded-t-2xl border-t-4 border-slate-200 flex items-center justify-center text-3xl font-black text-slate-900 font-kahoot shadow-2xl">
+                2
+              </div>
+            </div>
+
+            <!-- JUARA 1 (Gold) -->
+            <div class="flex-1 flex flex-col items-center podium-anim" style="animation-delay: 0.6s;">
+              <div class="w-20 h-20 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center text-4xl font-black shadow-xl shadow-amber-400/40 mb-2 border-2 border-amber-200 ring-4 ring-amber-300/30">
+                <span id="p1Avatar">👑</span>
+              </div>
+              <span id="p1Name" class="text-sm font-black font-kahoot text-amber-300 truncate max-w-[110px]">Juara 1</span>
+              <span id="p1Score" class="text-xs font-mono text-amber-200 font-bold mb-2">2,850 pts</span>
+              <div class="w-full bg-gradient-to-t from-amber-500 to-amber-300 h-48 rounded-t-2xl border-t-4 border-amber-100 flex items-center justify-center text-4xl font-black text-slate-950 font-kahoot shadow-2xl">
+                1
+              </div>
+            </div>
+
+            <!-- JUARA 3 (Bronze) -->
+            <div class="flex-1 flex flex-col items-center podium-anim" style="animation-delay: 0.1s;">
+              <div class="w-16 h-16 rounded-2xl bg-amber-700 text-amber-100 flex items-center justify-center text-3xl font-black shadow-xl mb-2">
+                <span id="p3Avatar">🥉</span>
+              </div>
+              <span id="p3Name" class="text-xs font-black font-kahoot text-white truncate max-w-[90px]">Player 3</span>
+              <span id="p3Score" class="text-[11px] font-mono text-amber-300 font-bold mb-2">1,200 pts</span>
+              <div class="w-full bg-gradient-to-t from-amber-800 to-amber-700 h-28 rounded-t-2xl border-t-4 border-amber-600 flex items-center justify-center text-3xl font-black text-amber-200 font-kahoot shadow-2xl">
+                3
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Footer Info Ticker -->
+        <div class="flex flex-col sm:flex-row items-center justify-between text-xs text-fuchsia-300/80 pt-4 border-t border-white/10 z-10 gap-2">
+          <span id="stageFooterTip" class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+            💡 Hover / Klik pada avatar mahasiswa di lobby untuk interaksi sorotan
+          </span>
+          <span id="lastJoinTicker" class="font-mono text-[11px] text-amber-300 font-semibold">Lobby Ready...</span>
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <!-- 2. STUDENT / PLAYER VIEW -->
+    <div id="viewStudent" class="max-w-md mx-auto w-full hidden">
+      
+      <!-- STUDENT JOIN FORM (STATE 1) -->
+      <div id="studentFormCard" class="bg-slate-900/90 backdrop-blur-xl border border-white/15 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+        
+        <div class="text-center space-y-2">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-fuchsia-500 via-purple-500 to-indigo-500 mx-auto flex items-center justify-center text-3xl shadow-xl shadow-fuchsia-500/30 animate-bounce">
+            🎓
+          </div>
+          <h2 class="text-2xl font-black font-kahoot text-white">Masuk Presensi & Kuis</h2>
+          <p class="text-xs text-slate-400">Buat avatarmu dan siap menjawab kuis di HP!</p>
+        </div>
+
+        <form id="studentJoinForm" onsubmit="handleStudentJoin(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-fuchsia-300 uppercase tracking-wider mb-1">PIN Game / Room</label>
+            <input type="text" id="joinPinInput" value="778-902" required class="w-full text-center font-black font-mono text-xl py-3 px-4 rounded-xl bg-black/40 border border-white/20 text-amber-300 focus:outline-none focus:border-fuchsia-500 transition">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-fuchsia-300 uppercase tracking-wider mb-1">Nama Mahasiswa <span class="text-rose-400">*</span></label>
+            <input type="text" id="joinNameInput" required placeholder="Contoh: Budi Santoso" class="w-full py-3 px-4 rounded-xl bg-black/40 border border-white/20 text-white placeholder-slate-500 focus:outline-none focus:border-fuchsia-500 font-semibold transition">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-fuchsia-300 uppercase tracking-wider mb-1">NIM (Opsional)</label>
+            <input type="text" id="joinNimInput" placeholder="Contoh: 21081010100" class="w-full py-2.5 px-4 rounded-xl bg-black/40 border border-white/20 text-white placeholder-slate-500 focus:outline-none focus:border-fuchsia-500 font-mono text-sm transition">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-fuchsia-300 uppercase tracking-wider mb-2">Pilih Avatar Emojimu</label>
+            <div id="avatarPickerGrid" class="grid grid-cols-5 gap-2"></div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-fuchsia-300 uppercase tracking-wider mb-2">Warna Card Avatar</label>
+            <div id="colorPickerGrid" class="flex justify-between gap-2"></div>
+          </div>
+
+          <button type="submit" id="joinSubmitBtn" class="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-400 via-fuchsia-500 to-indigo-500 text-slate-950 font-black font-kahoot text-lg shadow-xl shadow-fuchsia-500/20 hover:brightness-110 active:scale-[0.98] transition">
+            Masuk Ke Kelas 🚀
+          </button>
+        </form>
+
+      </div>
+
+      <!-- STUDENT WAITING IN LOBBY CARD (STATE 2) -->
+      <div id="studentWaitingCard" class="hidden bg-slate-900/90 backdrop-blur-xl border border-emerald-500/30 rounded-3xl p-8 shadow-2xl text-center space-y-6">
+        <div class="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-emerald-500/20 border border-emerald-500/40 text-5xl animate-bounce">
+          <span id="studentAvatarDisplay">🦊</span>
+        </div>
+
+        <div class="space-y-1">
+          <span class="inline-block px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold font-mono">
+            ✓ Terhubung Ke Room
+          </span>
+          <h2 id="studentNameDisplay" class="text-2xl font-black font-kahoot text-white">Budi Santoso</h2>
+          <p class="text-xs text-fuchsia-300">Siap-siap! Kuis akan muncul di layar ini.</p>
+        </div>
+
+        <div class="bg-black/40 border border-white/10 rounded-2xl p-4 text-xs text-slate-300 space-y-2">
+          <p class="font-bold text-amber-300 text-sm">👀 Perhatikan Proyektor Layar Dosen!</p>
+          <p class="text-[11px] text-slate-400">Namamu sedang melompat di depan kelas. Saat kuis dimulai, 4 tombol jawaban akan muncul di bawah.</p>
+        </div>
+
+        <button onclick="resetStudentForm()" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition">
+          🔄 Edit Profil
+        </button>
+      </div>
+
+      <!-- STUDENT QUESTION CONTROLLER (4 GEOMETRIC BUTTONS) (STATE 3) -->
+      <div id="studentQuizController" class="hidden space-y-4">
+        
+        <div class="bg-slate-900/90 border border-white/20 rounded-2xl p-4 flex items-center justify-between">
+          <span class="text-xs font-black font-kahoot text-amber-300" id="studentQuestionNum">Soal 1 / 3</span>
+          <span class="text-xs font-mono text-slate-300" id="studentScoreBadge">Skor: 0 pts</span>
+        </div>
+
+        <!-- 4 BIG KAHOOT GEOMETRIC TAP BUTTONS -->
+        <div class="grid grid-cols-2 gap-4 h-80">
+          
+          <!-- RED TRIANGLE -->
+          <button onclick="submitStudentAnswer(0)" class="btn-kahoot-red rounded-3xl shadow-2xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform p-4">
+            <span class="text-5xl drop-shadow-md">🔺</span>
+            <span class="font-black font-kahoot text-xs text-white/90">MERAH</span>
+          </button>
+
+          <!-- BLUE DIAMOND -->
+          <button onclick="submitStudentAnswer(1)" class="btn-kahoot-blue rounded-3xl shadow-2xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform p-4">
+            <span class="text-5xl drop-shadow-md">🔷</span>
+            <span class="font-black font-kahoot text-xs text-white/90">BIRU</span>
+          </button>
+
+          <!-- YELLOW CIRCLE -->
+          <button onclick="submitStudentAnswer(2)" class="btn-kahoot-yellow rounded-3xl shadow-2xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform p-4">
+            <span class="text-5xl drop-shadow-md">🟡</span>
+            <span class="font-black font-kahoot text-xs text-white/90">KUNING</span>
+          </button>
+
+          <!-- GREEN SQUARE -->
+          <button onclick="submitStudentAnswer(3)" class="btn-kahoot-green rounded-3xl shadow-2xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform p-4">
+            <span class="text-5xl drop-shadow-md">🟩</span>
+            <span class="font-black font-kahoot text-xs text-white/90">HIJAU</span>
+          </button>
+
+        </div>
+
+      </div>
+
+      <!-- STUDENT ANSWER SUBMITTED WAITING SCREEN (STATE 4) -->
+      <div id="studentAnswerSubmittedCard" class="hidden bg-slate-900/90 border border-fuchsia-500/30 rounded-3xl p-8 shadow-2xl text-center space-y-4">
+        <div class="text-6xl animate-bounce">🎯</div>
+        <h3 class="text-2xl font-black font-kahoot text-white">Jawaban Terkirim!</h3>
+        <p class="text-xs text-fuchsia-200">Menunggu semua mahasiswa selesai menjawab & timer habis...</p>
+      </div>
+
+      <!-- STUDENT RESULT FEEDBACK CARD (STATE 5) -->
+      <div id="studentResultCard" class="hidden bg-slate-900/90 border border-white/20 rounded-3xl p-8 shadow-2xl text-center space-y-4">
+        <div id="studentResultIcon" class="text-6xl">🎉</div>
+        <h3 id="studentResultTitle" class="text-3xl font-black font-kahoot text-emerald-400">BENAR!</h3>
+        <p id="studentPointsGained" class="text-lg font-black font-kahoot text-amber-300">+950 Poin</p>
+        <p id="studentTotalScoreText" class="text-xs font-mono text-slate-300">Total Skor Saat Ini: 950 pts</p>
+      </div>
+
+    </div>
+
+
+    <!-- 3. DEMO DUAL VIEW (SPLIT SCREEN) -->
+    <div id="viewDemo" class="hidden space-y-4">
+      <div class="bg-amber-500/20 border border-amber-500/40 rounded-2xl p-3 text-xs text-amber-200 flex items-center justify-between">
+        <span>💡 <b>Mode Dual View:</b> Layar HP Siswa (Kiri) & Layar Proyektor Dosen (Kanan) berjalan bersamaan!</span>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div class="lg:col-span-5 bg-black/30 p-4 rounded-3xl border border-white/10">
+          <span class="text-xs font-bold font-kahoot text-fuchsia-300 uppercase block mb-3">📱 Layar HP Mahasiswa</span>
+          <div id="demoStudentWrapper"></div>
+        </div>
+
+        <div class="lg:col-span-7 bg-black/30 p-4 rounded-3xl border border-white/10">
+          <span class="text-xs font-bold font-kahoot text-amber-300 uppercase block mb-3">📺 Layar Proyektor Dosen</span>
+          <div id="demoLecturerWrapper"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+
+  <!-- BANK SOAL MANAGEMENT MODAL -->
+  <div id="questionManagerModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-white/20 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 relative max-h-[90vh] overflow-y-auto">
+      
+      <button onclick="closeQuestionManagerModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white p-2">✕</button>
+
+      <h3 class="text-xl font-black font-kahoot text-amber-300">⚙️ Bank Soal Kuis Dosen</h3>
+      <p class="text-xs text-slate-300">Tambah atau sesuaikan soal kuis sebelum memulai kelas.</p>
+
+      <!-- Existing Questions List -->
+      <div id="questionListContainer" class="space-y-3">
+        <!-- Dynamically rendered question list -->
+      </div>
+
+      <!-- Add Question Form -->
+      <form id="addQuestionForm" onsubmit="handleAddQuestion(event)" class="bg-black/40 p-4 rounded-2xl border border-white/10 space-y-3 pt-3">
+        <span class="text-xs font-bold text-fuchsia-300 uppercase block">+ Tambah Soal Baru</span>
+        
+        <input type="text" id="newQTitle" placeholder="Tulis Pertanyaan..." required class="w-full p-2.5 rounded-xl bg-slate-800 border border-white/20 text-xs text-white">
+        
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <input type="text" id="newOpt0" placeholder="🔺 Opsi Merah" required class="p-2 rounded-lg bg-rose-950/60 border border-rose-500/40 text-white">
+          <input type="text" id="newOpt1" placeholder="🔷 Opsi Biru" required class="p-2 rounded-lg bg-blue-950/60 border border-blue-500/40 text-white">
+          <input type="text" id="newOpt2" placeholder="🟡 Opsi Kuning" required class="p-2 rounded-lg bg-amber-950/60 border border-amber-500/40 text-white">
+          <input type="text" id="newOpt3" placeholder="🟩 Opsi Hijau" required class="p-2 rounded-lg bg-emerald-950/60 border border-emerald-500/40 text-white">
+        </div>
+
+        <div class="flex items-center gap-2">
+          <label class="text-xs font-bold text-slate-300">Kunci Jawaban:</label>
+          <select id="newCorrectIndex" class="p-2 rounded-xl bg-slate-800 border border-white/20 text-xs text-amber-300 font-bold">
+            <option value="0">🔺 Merah</option>
+            <option value="1" selected>🔷 Biru</option>
+            <option value="2">🟡 Kuning</option>
+            <option value="3">🟩 Hijau</option>
+          </select>
+        </div>
+
+        <button type="submit" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold font-kahoot shadow-lg">
+          + Simpan Soal Ke Bank Soal
+        </button>
+      </form>
+
+    </div>
+  </div>
+
+
+  <!-- STUDENT PROFILE MODAL -->
+  <div id="profileModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-white/20 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-6 text-center relative animate-pop-in">
+      <button onclick="closeProfileModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white p-2 text-lg">✕</button>
+
+      <div id="modalAvatarBox" class="w-20 h-20 rounded-2xl bg-amber-400 mx-auto flex items-center justify-center text-4xl shadow-xl shadow-amber-400/30 animate-bounce">
+        🦊
+      </div>
+
+      <div class="space-y-1">
+        <h3 id="modalStudentName" class="text-xl font-black font-kahoot text-white">Budi Santoso</h3>
+        <p id="modalStudentNim" class="text-xs font-mono text-fuchsia-300">NIM: 21081010100</p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 pt-2">
+        <button id="spotlightBtn" onclick="toggleSpotlightCurrent()" class="py-2.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black font-kahoot text-xs shadow-lg shadow-amber-400/20 transition">
+          ⭐ Sorot
+        </button>
+        <button onclick="kickStudentCurrent()" class="py-2.5 px-4 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-bold text-xs transition">
+          🚫 Keluarkan
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- RESET CONFIRMATION MODAL -->
+  <div id="resetModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-white/20 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 text-center">
+      <div class="w-14 h-14 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-400 mx-auto flex items-center justify-center text-2xl">
+        🗑️
+      </div>
+      <h3 class="text-lg font-black font-kahoot text-white">Reset Room & Skor Kuis?</h3>
+      <p class="text-xs text-slate-300">
+        Seluruh data presensi dan skor kuis mahasiswa akan dibersihkan kembali ke Lobby.
+      </p>
+      <div class="flex items-center justify-center gap-3 pt-2">
+        <button onclick="closeResetModal()" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition">
+          Batal
+        </button>
+        <button onclick="confirmResetLobby()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-lg shadow-rose-600/30">
+          Ya, Reset Room
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- FIREBASE & APPLICATION LOGIC -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { 
+      getFirestore, 
+      collection, 
+      addDoc, 
+      onSnapshot, 
+      deleteDoc, 
+      doc, 
+      getDocs, 
+      updateDoc,
+      serverTimestamp 
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Global Config with User's Official Firebase Credentials
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'project-falwan';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' 
+      ? JSON.parse(__firebase_config) 
+      : {
+          apiKey: "AIzaSyDj_RPm1_GiSwMG3fZv9XU-rItmEaWFfmk",
+          authDomain: "project-falwan.firebaseapp.com",
+          projectId: "project-falwan",
+          storageBucket: "project-falwan.firebasestorage.app",
+          messagingSenderId: "127596650559",
+          appId: "1:127596650559:web:916ef9b549f0902498988a",
+          measurementId: "G-PRYNQDP8NQ"
+        };
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+    let app, db, auth;
+    let attendancesCollection = null;
+    let isFirebaseReady = false;
+    let audioEnabled = true;
+
+    // Presets
+    const EMOJI_OPTIONS = ['🦊', '🐯', '🚀', '👾', '🦄', '👑', '🐼', '⚡', '🍕', '🎯'];
+    const COLOR_OPTIONS = [
+      { id: 'amber', bg: 'bg-amber-400', text: 'text-slate-950', border: 'border-amber-300' },
+      { id: 'fuchsia', bg: 'bg-fuchsia-500', text: 'text-white', border: 'border-fuchsia-400' },
+      { id: 'emerald', bg: 'bg-emerald-400', text: 'text-slate-950', border: 'border-emerald-300' },
+      { id: 'cyan', bg: 'bg-cyan-400', text: 'text-slate-950', border: 'border-cyan-300' },
+      { id: 'rose', bg: 'bg-rose-500', text: 'text-white', border: 'border-rose-400' },
+      { id: 'indigo', bg: 'bg-indigo-500', text: 'text-white', border: 'border-indigo-400' }
+    ];
+
+    let selectedAvatar = EMOJI_OPTIONS[0];
+    let selectedColor = COLOR_OPTIONS[0];
+
+    // State
+    let studentsList = [];
+    let initialLoadDone = false;
+    let selectedStudentIdForModal = null;
+    let currentRole = 'lecturer';
+    let isPartyMode = false;
+    let currentStudentSessionId = null;
+
+    // GAME QUIZ ENGINE STATE
+    // Phases: 'LOBBY' | 'QUESTION' | 'RESULT' | 'LEADERBOARD' | 'PODIUM'
+    let gameState = 'LOBBY'; 
+    let currentQuestionIndex = 0;
+    let timerSeconds = 20;
+    let timerInterval = null;
+    let questionStartTime = 0;
+
+    // Quiz Questions Bank
+    let quizQuestions = [
+      {
+        question: "Bahasa Pemrograman apa yang digunakan untuk membuat logika interaktif di browser web?",
+        options: ["Python", "JavaScript", "C++", "HTML"],
+        correctIndex: 1,
+        timeLimit: 20
+      },
+      {
+        question: "Manakah sintaks yang benar untuk membuat variabel di JavaScript modern?",
+        options: ["var_num x = 5", "const x = 5", "dim x = 5", "create x = 5"],
+        correctIndex: 1,
+        timeLimit: 20
+      },
+      {
+        question: "Metode Array mana yang digunakan untuk menambah elemen baru di akhir array?",
+        options: ["pop()", "push()", "shift()", "unshift()"],
+        correctIndex: 1,
+        timeLimit: 20
+      }
+    ];
+
+    // Expose Functions to Window
+    window.switchRole = switchRole;
+    window.handleStudentJoin = handleStudentJoin;
+    window.simulateStudentJoin = simulateStudentJoin;
+    window.openResetModal = openResetModal;
+    window.closeResetModal = closeResetModal;
+    window.confirmResetLobby = confirmResetLobby;
+    window.openProfileModal = openProfileModal;
+    window.closeProfileModal = closeProfileModal;
+    window.toggleSpotlightCurrent = toggleSpotlightCurrent;
+    window.kickStudentCurrent = kickStudentCurrent;
+    window.copyRoomPIN = copyRoomPIN;
+    window.toggleAudio = toggleAudio;
+    window.resetStudentForm = resetStudentForm;
+    window.togglePartyMode = togglePartyMode;
+    window.hoverAvatarSound = hoverAvatarSound;
+    window.handleHostMainAction = handleHostMainAction;
+    window.submitStudentAnswer = submitStudentAnswer;
+    window.openQuestionManagerModal = openQuestionManagerModal;
+    window.closeQuestionManagerModal = closeQuestionManagerModal;
+    window.handleAddQuestion = handleAddQuestion;
+
+    // -------------------------------------------------------------
+    // AUDIO SYNTHESIZER
+    // -------------------------------------------------------------
+    function playSound(type) {
+      if (!audioEnabled) return;
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        if (type === 'boing') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(180, now);
+          osc.frequency.exponentialRampToValueAtTime(520, now + 0.08);
+          osc.frequency.exponentialRampToValueAtTime(240, now + 0.2);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.start(now); osc.stop(now + 0.22);
+        } else if (type === 'pop') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(280, now);
+          osc.frequency.exponentialRampToValueAtTime(850, now + 0.09);
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.start(now); osc.stop(now + 0.12);
+        } else if (type === 'tick') {
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(600, now);
+          gain.gain.setValueAtTime(0.1, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.start(now); osc.stop(now + 0.05);
+        } else if (type === 'correct') {
+          const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+          notes.forEach((freq, idx) => {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            const st = now + (idx * 0.08);
+            o.type = 'triangle';
+            o.frequency.setValueAtTime(freq, st);
+            g.gain.setValueAtTime(0.3, st);
+            g.gain.exponentialRampToValueAtTime(0.001, st + 0.25);
+            o.connect(g); g.connect(ctx.destination);
+            o.start(st); o.stop(st + 0.25);
+          });
+        } else if (type === 'wrong') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.exponentialRampToValueAtTime(110, now + 0.3);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.start(now); osc.stop(now + 0.3);
+        } else if (type === 'fanfare') {
+          const notes = [523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((freq, idx) => {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            const st = now + (idx * 0.08);
+            o.type = 'triangle';
+            o.frequency.setValueAtTime(freq, st);
+            g.gain.setValueAtTime(0.35, st);
+            g.gain.exponentialRampToValueAtTime(0.001, st + 0.35);
+            o.connect(g); g.connect(ctx.destination);
+            o.start(st); o.stop(st + 0.35);
+          });
+        }
+      } catch (e) {
+        console.warn("Audio err:", e);
+      }
+    }
+
+    function hoverAvatarSound() { playSound('boing'); }
+
+    function toggleAudio() {
+      audioEnabled = !audioEnabled;
+      document.getElementById('soundIcon').innerText = audioEnabled ? '🔊' : '🔇';
+      document.getElementById('soundLabel').innerText = audioEnabled ? 'Suara On' : 'Suara Mute';
+      if (audioEnabled) playSound('boing');
+    }
+
+    // -------------------------------------------------------------
+    // CONFETTI CANVAS
+    // -------------------------------------------------------------
+    function fireConfetti(durationSeconds = 2.5) {
+      const canvas = document.getElementById('confettiCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const particles = [];
+      const colors = ['#f59e0b', '#ec4899', '#8b5cf6', '#10b981', '#06b6d4', '#e21b3c', '#1368ce'];
+
+      for (let i = 0; i < 120; i++) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height - canvas.height,
+          size: Math.random() * 10 + 6,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          vx: (Math.random() - 0.5) * 6,
+          vy: Math.random() * 5 + 4,
+          rotation: Math.random() * 360,
+          rotSpeed: (Math.random() - 0.5) * 10
+        });
+      }
+
+      let startTime = performance.now();
+      function render(now) {
+        const elapsed = (now - startTime) / 1000;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => {
+          p.x += p.vx; p.y += p.vy; p.rotation += p.rotSpeed;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate((p.rotation * Math.PI) / 180);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+          ctx.restore();
+        });
+        if (elapsed < durationSeconds) requestAnimationFrame(render);
+        else ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      requestAnimationFrame(render);
+    }
+
+    // -------------------------------------------------------------
+    // FIREBASE INITIALIZATION
+    // -------------------------------------------------------------
+    async function initFirebase() {
+      try {
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+
+        if (initialAuthToken) {
+          await signInWithCustomToken(auth, initialAuthToken);
+        } else {
+          await signInAnonymously(auth);
+        }
+
+        attendancesCollection = collection(db, 'artifacts', appId, 'public', 'data', 'attendances');
+        setupRealtimeListener();
+        isFirebaseReady = true;
+        document.getElementById('syncStatus').innerText = "Live Synced";
+      } catch (err) {
+        console.warn("Firestore fallback to local memory state:", err);
+        document.getElementById('syncStatus').innerText = "Demo Mode";
+        isFirebaseReady = false;
+      }
+    }
+
+    function setupRealtimeListener() {
+      if (!attendancesCollection) return;
+      onSnapshot(attendancesCollection, (snapshot) => {
+        const docs = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          docs.push({
+            id: docSnap.id,
+            name: data.name || '',
+            nim: data.nim || '',
+            avatar: data.avatar || '🦊',
+            colorId: data.colorId || 'amber',
+            isSpotlight: data.isSpotlight || false,
+            score: data.score || 0,
+            lastAnswerIndex: data.lastAnswerIndex ?? null,
+            lastAnswerTime: data.lastAnswerTime || 0,
+            bounceDelay: data.bounceDelay || (Math.random() * 1.5).toFixed(2) + 's',
+            bounceDuration: data.bounceDuration || (1.4 + Math.random() * 0.9).toFixed(2) + 's',
+            jumpHeight: data.jumpHeight || (-14 - Math.floor(Math.random() * 14)) + 'px',
+            wiggleDeg: data.wiggleDeg || (-6 + Math.floor(Math.random() * 12)) + 'deg',
+            createdAt: data.createdAt ? data.createdAt.toDate() : new Date(data.timestamp || Date.now())
+          });
+        });
+
+        docs.sort((a, b) => a.createdAt - b.createdAt);
+
+        if (initialLoadDone) {
+          snapshot.docChanges().forEach((change) => {
+            if (change.type === 'added' && gameState === 'LOBBY') {
+              playSound('pop');
+              fireConfetti(1.2);
+            }
+          });
+        }
+
+        studentsList = docs;
+        initialLoadDone = true;
+
+        if (gameState === 'LOBBY') renderLobbyStage();
+        updateSubmittedCountUI();
+      }, (err) => console.error(err));
+    }
+
+    // -------------------------------------------------------------
+    // KAHOOT GAME ENGINE STATE MACHINE
+    // -------------------------------------------------------------
+    function setGameState(newState) {
+      gameState = newState;
+      
+      const hostLobby = document.getElementById('hostLobbyPhase');
+      const hostQuestion = document.getElementById('hostQuestionPhase');
+      const hostResult = document.getElementById('hostResultPhase');
+      const hostLeaderboard = document.getElementById('hostLeaderboardPhase');
+      const hostPodium = document.getElementById('hostPodiumPhase');
+      const gameBadge = document.getElementById('gamePhaseBadge');
+
+      [hostLobby, hostQuestion, hostResult, hostLeaderboard, hostPodium].forEach(el => el.classList.add('hidden'));
+
+      if (newState === 'LOBBY') {
+        hostLobby.classList.remove('hidden');
+        gameBadge.innerText = 'Lobby Presensi 🟢';
+        document.getElementById('mainHostBtn').innerText = '🚀 Mulai Kuis Kahoot!';
+        renderLobbyStage();
+      } 
+      else if (newState === 'QUESTION') {
+        hostQuestion.classList.remove('hidden');
+        gameBadge.innerText = `Soal ${currentQuestionIndex + 1}/${quizQuestions.length} ⚡`;
+        document.getElementById('mainHostBtn').innerText = '⏩ Lewati Timer';
+        setupQuestionStage();
+      } 
+      else if (newState === 'RESULT') {
+        hostResult.classList.remove('hidden');
+        gameBadge.innerText = 'Hasil Jawaban 📊';
+        document.getElementById('mainHostBtn').innerText = '📊 Lihat Leaderboard';
+        setupResultStage();
+      } 
+      else if (newState === 'LEADERBOARD') {
+        hostLeaderboard.classList.remove('hidden');
+        gameBadge.innerText = 'Leaderboard 🏆';
+        if (currentQuestionIndex < quizQuestions.length - 1) {
+          document.getElementById('mainHostBtn').innerText = '➡️ Soal Berikutnya';
+        } else {
+          document.getElementById('mainHostBtn').innerText = '👑 Lihat Podium Final!';
+        }
+        setupLeaderboardStage();
+      } 
+      else if (newState === 'PODIUM') {
+        hostPodium.classList.remove('hidden');
+        gameBadge.innerText = 'Podium Juara 🎉';
+        document.getElementById('mainHostBtn').innerText = '🔄 Kembali ke Lobby';
+        setupPodiumStage();
+      }
+
+      updateStudentViewForPhase();
+    }
+
+    function handleHostMainAction() {
+      if (gameState === 'LOBBY') {
+        if (studentsList.length === 0) {
+          simulateStudentJoin(); // Auto add sample student if empty
+        }
+        currentQuestionIndex = 0;
+        setGameState('QUESTION');
+      } else if (gameState === 'QUESTION') {
+        // Skip timer
+        clearInterval(timerInterval);
+        setGameState('RESULT');
+      } else if (gameState === 'RESULT') {
+        setGameState('LEADERBOARD');
+      } else if (gameState === 'LEADERBOARD') {
+        if (currentQuestionIndex < quizQuestions.length - 1) {
+          currentQuestionIndex++;
+          setGameState('QUESTION');
+        } else {
+          setGameState('PODIUM');
+        }
+      } else if (gameState === 'PODIUM') {
+        setGameState('LOBBY');
+      }
+    }
+
+    // 1. QUESTION PHASE LOGIC
+    function setupQuestionStage() {
+      const q = quizQuestions[currentQuestionIndex];
+      document.getElementById('questionNumberBadge').innerText = `SOAL ${currentQuestionIndex + 1} DARI ${quizQuestions.length}`;
+      document.getElementById('hostQuestionTitle').innerText = q.question;
+      document.getElementById('hostOpt0').innerText = `A. ${q.options[0]}`;
+      document.getElementById('hostOpt1').innerText = `B. ${q.options[1]}`;
+      document.getElementById('hostOpt2').innerText = `C. ${q.options[2]}`;
+      document.getElementById('hostOpt3').innerText = `D. ${q.options[3]}`;
+
+      // Reset Student Answers for current question
+      studentsList.forEach(s => {
+        s.lastAnswerIndex = null;
+        s.lastAnswerTime = 0;
+      });
+
+      timerSeconds = q.timeLimit || 20;
+      document.getElementById('questionTimerDisplay').innerText = timerSeconds;
+      questionStartTime = Date.now();
+      updateSubmittedCountUI();
+
+      playSound('fanfare');
+
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        timerSeconds--;
+        document.getElementById('questionTimerDisplay').innerText = timerSeconds;
+        if (timerSeconds <= 5) playSound('tick');
+
+        if (timerSeconds <= 0) {
+          clearInterval(timerInterval);
+          setGameState('RESULT');
+        }
+      }, 1000);
+    }
+
+    function updateSubmittedCountUI() {
+      const submitted = studentsList.filter(s => s.lastAnswerIndex !== null).length;
+      document.getElementById('submittedCount').innerText = submitted;
+      document.getElementById('totalStudentsCount').innerText = studentsList.length;
+
+      // Auto finish if all students answered
+      if (gameState === 'QUESTION' && studentsList.length > 0 && submitted >= studentsList.length) {
+        clearInterval(timerInterval);
+        setTimeout(() => setGameState('RESULT'), 800);
+      }
+    }
+
+    // 2. RESULT PHASE LOGIC
+    function setupResultStage() {
+      playSound('fanfare');
+      const q = quizQuestions[currentQuestionIndex];
+      document.getElementById('resultQuestionTitle').innerText = q.question;
+
+      const optionCounts = [0, 0, 0, 0];
+      studentsList.forEach(s => {
+        if (s.lastAnswerIndex !== null && s.lastAnswerIndex >= 0 && s.lastAnswerIndex <= 3) {
+          optionCounts[s.lastAnswerIndex]++;
+        }
+      });
+
+      const maxCount = Math.max(...optionCounts, 1);
+      
+      for (let i = 0; i < 4; i++) {
+        document.getElementById(`countBar${i}`).innerText = optionCounts[i];
+        const heightPct = Math.max(12, Math.round((optionCounts[i] / maxCount) * 100));
+        document.getElementById(`barVisual${i}`).style.height = `${heightPct}%`;
+      }
+
+      const colors = ['🔺 Red', '🔷 Blue', '🟡 Yellow', '🟩 Green'];
+      document.getElementById('correctAnswerText').innerText = `${colors[q.correctIndex]}. ${q.options[q.correctIndex]}`;
+
+      // Calculate Scores
+      studentsList.forEach(s => {
+        if (s.lastAnswerIndex === q.correctIndex) {
+          // Speed Bonus: max 1000 points
+          const speedBonus = Math.max(100, Math.round(1000 - (s.lastAnswerTime * 40)));
+          s.score = (s.score || 0) + speedBonus;
+          s.lastPointsGained = speedBonus;
+        } else {
+          s.lastPointsGained = 0;
+        }
+      });
+    }
+
+    // 3. LEADERBOARD STAGE LOGIC
+    function setupLeaderboardStage() {
+      playSound('fanfare');
+      const sorted = [...studentsList].sort((a, b) => b.score - a.score);
+      const container = document.getElementById('leaderboardList');
+
+      container.innerHTML = sorted.slice(0, 5).map((st, idx) => `
+        <div class="bg-slate-900/90 border border-amber-400/30 rounded-2xl p-4 flex items-center justify-between shadow-xl animate-pop-in" style="animation-delay: ${idx * 0.1}s">
+          <div class="flex items-center gap-3">
+            <span class="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 font-black font-kahoot flex items-center justify-center text-sm">
+              #${idx + 1}
+            </span>
+            <span class="text-2xl">${st.avatar}</span>
+            <div>
+              <p class="font-black font-kahoot text-sm text-white">${escapeHtml(st.name)}</p>
+              <p class="text-[10px] text-emerald-300 font-mono">+${st.lastPointsGained || 0} pts soal ini</p>
+            </div>
+          </div>
+          <span class="text-lg font-black font-kahoot text-amber-300">${st.score || 0} pts</span>
+        </div>
+      `).join('');
+    }
+
+    // 4. PODIUM STAGE LOGIC
+    function setupPodiumStage() {
+      playSound('fanfare');
+      fireConfetti(4.0);
+
+      const sorted = [...studentsList].sort((a, b) => b.score - a.score);
+      const p1 = sorted[0] || { name: '-', avatar: '👑', score: 0 };
+      const p2 = sorted[1] || { name: '-', avatar: '🥈', score: 0 };
+      const p3 = sorted[2] || { name: '-', avatar: '🥉', score: 0 };
+
+      document.getElementById('p1Name').innerText = p1.name;
+      document.getElementById('p1Avatar').innerText = p1.avatar;
+      document.getElementById('p1Score').innerText = `${p1.score} pts`;
+
+      document.getElementById('p2Name').innerText = p2.name;
+      document.getElementById('p2Avatar').innerText = p2.avatar;
+      document.getElementById('p2Score').innerText = `${p2.score} pts`;
+
+      document.getElementById('p3Name').innerText = p3.name;
+      document.getElementById('p3Avatar').innerText = p3.avatar;
+      document.getElementById('p3Score').innerText = `${p3.score} pts`;
+    }
+
+    // -------------------------------------------------------------
+    // STUDENT CONTROLLER LOGIC
+    // -------------------------------------------------------------
+    function updateStudentViewForPhase() {
+      const studentWaitingCard = document.getElementById('studentWaitingCard');
+      const studentQuizController = document.getElementById('studentQuizController');
+      const studentAnswerSubmittedCard = document.getElementById('studentAnswerSubmittedCard');
+      const studentResultCard = document.getElementById('studentResultCard');
+
+      if (!studentWaitingCard) return;
+
+      [studentWaitingCard, studentQuizController, studentAnswerSubmittedCard, studentResultCard].forEach(el => el.classList.add('hidden'));
+
+      if (gameState === 'LOBBY') {
+        studentWaitingCard.classList.remove('hidden');
+      } else if (gameState === 'QUESTION') {
+        const me = getCurrentStudent();
+        if (me && me.lastAnswerIndex !== null) {
+          studentAnswerSubmittedCard.classList.remove('hidden');
+        } else {
+          studentQuizController.classList.remove('hidden');
+          document.getElementById('studentQuestionNum').innerText = `Soal ${currentQuestionIndex + 1} / ${quizQuestions.length}`;
+          document.getElementById('studentScoreBadge').innerText = `Skor: ${me?.score || 0} pts`;
+        }
+      } else if (gameState === 'RESULT' || gameState === 'LEADERBOARD' || gameState === 'PODIUM') {
+        studentResultCard.classList.remove('hidden');
+        const me = getCurrentStudent();
+        const q = quizQuestions[currentQuestionIndex];
+
+        if (me && me.lastAnswerIndex === q.correctIndex) {
+          document.getElementById('studentResultIcon').innerText = '🎉';
+          document.getElementById('studentResultTitle').innerText = 'BENAR!';
+          document.getElementById('studentResultTitle').className = 'text-3xl font-black font-kahoot text-emerald-400';
+          document.getElementById('studentPointsGained').innerText = `+${me.lastPointsGained || 0} Poin`;
+          playSound('correct');
+        } else {
+          document.getElementById('studentResultIcon').innerText = '❌';
+          document.getElementById('studentResultTitle').innerText = 'SALAH';
+          document.getElementById('studentResultTitle').className = 'text-3xl font-black font-kahoot text-rose-400';
+          document.getElementById('studentPointsGained').innerText = '+0 Poin';
+          playSound('wrong');
+        }
+        document.getElementById('studentTotalScoreText').innerText = `Total Skor Saat Ini: ${me?.score || 0} pts`;
+      }
+    }
+
+    function getCurrentStudent() {
+      return studentsList.find(s => s.id === currentStudentSessionId) || studentsList[0];
+    }
+
+    function submitStudentAnswer(optionIndex) {
+      const me = getCurrentStudent();
+      if (!me) return;
+
+      const timeSpent = (Date.now() - questionStartTime) / 1000;
+      me.lastAnswerIndex = optionIndex;
+      me.lastAnswerTime = timeSpent;
+
+      playSound('pop');
+      updateSubmittedCountUI();
+      updateStudentViewForPhase();
+    }
+
+    // -------------------------------------------------------------
+    // STUDENT JOIN SUBMISSION
+    // -------------------------------------------------------------
+    async function handleStudentJoin(e) {
+      e.preventDefault();
+      const nameInput = document.getElementById('joinNameInput');
+      const nimInput = document.getElementById('joinNimInput');
+      const btn = document.getElementById('joinSubmitBtn');
+
+      const name = nameInput.value.trim();
+      const nim = nimInput.value.trim();
+      if (!name) return;
+
+      btn.disabled = true;
+      btn.innerText = "Mengirim...";
+
+      const record = {
+        name: name,
+        nim: nim,
+        avatar: selectedAvatar,
+        colorId: selectedColor.id,
+        isSpotlight: false,
+        score: 0,
+        lastAnswerIndex: null,
+        lastAnswerTime: 0,
+        bounceDelay: (Math.random() * 1.5).toFixed(2) + 's',
+        bounceDuration: (1.4 + Math.random() * 0.9).toFixed(2) + 's',
+        jumpHeight: (-14 - Math.floor(Math.random() * 14)) + 'px',
+        wiggleDeg: (-6 + Math.floor(Math.random() * 12)) + 'deg',
+        timestamp: Date.now(),
+        createdAt: serverTimestamp()
+      };
+
+      try {
+        if (isFirebaseReady && attendancesCollection) {
+          const docRef = await addDoc(attendancesCollection, record);
+          currentStudentSessionId = docRef.id;
+        } else {
+          const mockId = 'mem_' + Date.now();
+          currentStudentSessionId = mockId;
+          studentsList.push({ ...record, id: mockId, createdAt: new Date() });
+          playSound('pop');
+          fireConfetti(1.5);
+          renderLobbyStage();
+        }
+
+        document.getElementById('studentFormCard').classList.add('hidden');
+        document.getElementById('studentAvatarDisplay').innerText = selectedAvatar;
+        document.getElementById('studentNameDisplay').innerText = name;
+
+        updateStudentViewForPhase();
+
+      } catch (err) {
+        console.error("Error joining:", err);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "Masuk Ke Kelas 🚀";
+      }
+    }
+
+    function resetStudentForm() {
+      document.getElementById('studentWaitingCard').classList.add('hidden');
+      document.getElementById('studentFormCard').classList.remove('hidden');
+    }
+
+    function simulateStudentJoin() {
+      const names = ['Andi Wijaya', 'Siti Rahma', 'Rian Hidayat', 'Dian Permata', 'Eko Prasetyo', 'Maya Putri'];
+      const randomName = names[Math.floor(Math.random() * names.length)] + ' ' + Math.floor(Math.random() * 90 + 10);
+      const randomNim = '21' + Math.floor(10000000 + Math.random() * 90000000);
+      const randomAvatar = EMOJI_OPTIONS[Math.floor(Math.random() * EMOJI_OPTIONS.length)];
+      const randomColor = COLOR_OPTIONS[Math.floor(Math.random() * COLOR_OPTIONS.length)];
+
+      const record = {
+        name: randomName,
+        nim: randomNim,
+        avatar: randomAvatar,
+        colorId: randomColor.id,
+        isSpotlight: false,
+        score: 0,
+        lastAnswerIndex: null,
+        lastAnswerTime: 0,
+        bounceDelay: (Math.random() * 1.5).toFixed(2) + 's',
+        bounceDuration: (1.4 + Math.random() * 0.9).toFixed(2) + 's',
+        jumpHeight: (-14 - Math.floor(Math.random() * 14)) + 'px',
+        wiggleDeg: (-6 + Math.floor(Math.random() * 12)) + 'deg',
+        timestamp: Date.now(),
+        createdAt: serverTimestamp()
+      };
+
+      if (isFirebaseReady && attendancesCollection) {
+        addDoc(attendancesCollection, record);
+      } else {
+        studentsList.push({ ...record, id: 'mem_' + Date.now(), createdAt: new Date() });
+        playSound('pop');
+        fireConfetti(1.5);
+        renderLobbyStage();
+      }
+    }
+
+    // -------------------------------------------------------------
+    // RENDER BOUNCING AVATARS IN LOBBY
+    // -------------------------------------------------------------
+    function renderLobbyStage() {
+      const grid = document.getElementById('lobbyStageGrid');
+      const counter = document.getElementById('playerCounter');
+      const emptyState = document.getElementById('lobbyEmptyState');
+      const stageContainer = document.getElementById('lecturerStageContainer');
+
+      if (!grid) return;
+      if (counter) counter.innerText = studentsList.length;
+
+      if (isPartyMode) stageContainer.classList.add('party-active');
+      else stageContainer.classList.remove('party-active');
+
+      if (studentsList.length === 0) {
+        grid.innerHTML = '';
+        if (emptyState) grid.appendChild(emptyState);
+        return;
+      }
+
+      grid.innerHTML = studentsList.map((st) => {
+        const colorObj = COLOR_OPTIONS.find(c => c.id === st.colorId) || COLOR_OPTIONS[0];
+        const spotlightClass = st.isSpotlight ? 'spotlight-card border-amber-300 ring-4 ring-amber-400 scale-110' : '';
+
+        return `
+          <div onclick="openProfileModal('${st.id}')" 
+               onmouseenter="hoverAvatarSound()"
+               style="--bounce-delay: ${st.bounceDelay}; --bounce-duration: ${st.bounceDuration}; --jump-height: ${st.jumpHeight}; --wiggle-deg: ${st.wiggleDeg};"
+               class="avatar-hopping-card animate-pop-in cursor-pointer group relative bg-slate-900/85 backdrop-blur-md border ${colorObj.border} rounded-2xl p-3 flex flex-col items-center space-y-2 hover:scale-115 transition-transform shadow-xl ${spotlightClass}">
+            
+            <div class="w-14 h-14 rounded-2xl ${colorObj.bg} ${colorObj.text} flex items-center justify-center text-3xl shadow-lg group-hover:rotate-12 transition-transform">
+              ${st.avatar}
+            </div>
+
+            <div class="text-center w-full px-1">
+              <p class="font-black font-kahoot text-xs text-white truncate group-hover:text-amber-300 transition-colors">
+                ${escapeHtml(st.name)}
+              </p>
+              <p class="text-[10px] font-mono text-slate-400 truncate">
+                ${escapeHtml(st.nim || 'Hadir')}
+              </p>
+            </div>
+
+            ${st.isSpotlight ? `<span class="absolute -top-2 -right-2 text-xs bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded-full font-black shadow-lg animate-bounce">⭐</span>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function togglePartyMode() {
+      isPartyMode = !isPartyMode;
+      const partyBtn = document.getElementById('partyModeBtn');
+      if (isPartyMode) {
+        partyBtn.innerText = '🔥 Party!';
+        playSound('fanfare');
+        fireConfetti(3.5);
+      } else {
+        partyBtn.innerText = '🎉 Party';
+      }
+      renderLobbyStage();
+    }
+
+    // -------------------------------------------------------------
+    // QUESTION MANAGER MODAL LOGIC
+    // -------------------------------------------------------------
+    function openQuestionManagerModal() {
+      renderQuestionManagerList();
+      document.getElementById('questionManagerModal').classList.remove('hidden');
+    }
+
+    function closeQuestionManagerModal() {
+      document.getElementById('questionManagerModal').classList.add('hidden');
+    }
+
+    function renderQuestionManagerList() {
+      const container = document.getElementById('questionListContainer');
+      container.innerHTML = quizQuestions.map((q, idx) => `
+        <div class="bg-black/40 p-3 rounded-2xl border border-white/10 flex items-center justify-between text-xs">
+          <div>
+            <span class="font-black text-amber-300 font-kahoot block">Soal ${idx + 1}: ${escapeHtml(q.question)}</span>
+            <span class="text-[11px] text-slate-400">Kunci: ${['🔺 Merah', '🔷 Biru', '🟡 Kuning', '🟩 Hijau'][q.correctIndex]}</span>
+          </div>
+          ${quizQuestions.length > 1 ? `<button onclick="deleteQuestion(${idx})" class="p-1.5 text-rose-400 hover:text-rose-200">🗑️</button>` : ''}
+        </div>
+      `).join('');
+    }
+
+    window.deleteQuestion = function(index) {
+      if (quizQuestions.length <= 1) return;
+      quizQuestions.splice(index, 1);
+      renderQuestionManagerList();
+      document.getElementById('quizProgressText').innerText = `Bank Soal: ${quizQuestions.length} Soal Ready`;
+    };
+
+    function handleAddQuestion(e) {
+      e.preventDefault();
+      const title = document.getElementById('newQTitle').value.trim();
+      const opt0 = document.getElementById('newOpt0').value.trim();
+      const opt1 = document.getElementById('newOpt1').value.trim();
+      const opt2 = document.getElementById('newOpt2').value.trim();
+      const opt3 = document.getElementById('newOpt3').value.trim();
+      const correct = parseInt(document.getElementById('newCorrectIndex').value);
+
+      if (!title || !opt0 || !opt1 || !opt2 || !opt3) return;
+
+      quizQuestions.push({
+        question: title,
+        options: [opt0, opt1, opt2, opt3],
+        correctIndex: correct,
+        timeLimit: 20
+      });
+
+      document.getElementById('addQuestionForm').reset();
+      renderQuestionManagerList();
+      document.getElementById('quizProgressText').innerText = `Bank Soal: ${quizQuestions.length} Soal Ready`;
+      playSound('pop');
+    }
+
+    // -------------------------------------------------------------
+    // PROFILE & RESET MODALS
+    // -------------------------------------------------------------
+    function openProfileModal(studentId) {
+      playSound('boing');
+      const student = studentsList.find(s => s.id === studentId);
+      if (!student) return;
+
+      selectedStudentIdForModal = studentId;
+      document.getElementById('modalAvatarBox').innerText = student.avatar;
+      document.getElementById('modalStudentName').innerText = student.name;
+      document.getElementById('modalStudentNim').innerText = student.nim ? `NIM: ${student.nim}` : 'Mahasiswa';
+
+      const spotlightBtn = document.getElementById('spotlightBtn');
+      spotlightBtn.innerText = student.isSpotlight ? '⭐ Hapus Sorotan' : '⭐ Sorot';
+
+      document.getElementById('profileModal').classList.remove('hidden');
+    }
+
+    function closeProfileModal() {
+      document.getElementById('profileModal').classList.add('hidden');
+      selectedStudentIdForModal = null;
+    }
+
+    async function toggleSpotlightCurrent() {
+      if (!selectedStudentIdForModal) return;
+      const student = studentsList.find(s => s.id === selectedStudentIdForModal);
+      if (!student) return;
+
+      const newStatus = !student.isSpotlight;
+      if (isFirebaseReady && attendancesCollection) {
+        const studentRef = doc(db, 'artifacts', appId, 'public', 'data', 'attendances', selectedStudentIdForModal);
+        await updateDoc(studentRef, { isSpotlight: newStatus });
+      } else {
+        student.isSpotlight = newStatus;
+        renderLobbyStage();
+      }
+
+      if (newStatus) playSound('fanfare');
+      closeProfileModal();
+    }
+
+    async function kickStudentCurrent() {
+      if (!selectedStudentIdForModal) return;
+      if (isFirebaseReady && attendancesCollection) {
+        const studentRef = doc(db, 'artifacts', appId, 'public', 'data', 'attendances', selectedStudentIdForModal);
+        await deleteDoc(studentRef);
+      } else {
+        studentsList = studentsList.filter(s => s.id !== selectedStudentIdForModal);
+        renderLobbyStage();
+      }
+      closeProfileModal();
+    }
+
+    function openResetModal() { document.getElementById('resetModal').classList.remove('hidden'); }
+    function closeResetModal() { document.getElementById('resetModal').classList.add('hidden'); }
+
+    async function confirmResetLobby() {
+      closeResetModal();
+      if (isFirebaseReady && attendancesCollection) {
+        try {
+          const snapshot = await getDocs(attendancesCollection);
+          const deletes = snapshot.docs.map(d => deleteDoc(doc(attendancesCollection, d.id)));
+          await Promise.all(deletes);
+        } catch (err) { console.error(err); }
+      } else {
+        studentsList = [];
+      }
+      setGameState('LOBBY');
+    }
+
+    function copyRoomPIN() {
+      const pinText = document.getElementById('roomPinDisplay').innerText;
+      const tempInput = document.createElement('input');
+      tempInput.value = pinText;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempInput);
+      playSound('pop');
+    }
+
+    // -------------------------------------------------------------
+    // ROLE SWITCHING & CUSTOMIZERS
+    // -------------------------------------------------------------
+    function switchRole(role) {
+      currentRole = role;
+      const vLecturer = document.getElementById('viewLecturer');
+      const vStudent = document.getElementById('viewStudent');
+      const vDemo = document.getElementById('viewDemo');
+
+      const tLecturer = document.getElementById('tabLecturer');
+      const tStudent = document.getElementById('tabStudent');
+      const tDemo = document.getElementById('tabDemo');
+
+      const demoStudentWrp = document.getElementById('demoStudentWrapper');
+      const demoLecturerWrp = document.getElementById('demoLecturerWrapper');
+
+      const lecturerTopBar = document.getElementById('lecturerTopBar');
+      const lecturerStageContainer = document.getElementById('lecturerStageContainer');
+      const studentFormCard = document.getElementById('studentFormCard');
+      const studentWaitingCard = document.getElementById('studentWaitingCard');
+      const studentQuizController = document.getElementById('studentQuizController');
+      const studentAnswerSubmittedCard = document.getElementById('studentAnswerSubmittedCard');
+      const studentResultCard = document.getElementById('studentResultCard');
+
+      [tLecturer, tStudent, tDemo].forEach(btn => {
+        if (btn) btn.className = "px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-slate-300 hover:text-white";
+      });
+
+      const activeClass = "px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-white bg-fuchsia-600 shadow-md";
+
+      if (vLecturer) vLecturer.classList.add('hidden');
+      if (vStudent) vStudent.classList.add('hidden');
+      if (vDemo) vDemo.classList.add('hidden');
+
+      if (role === 'lecturer') {
+        if (tLecturer) tLecturer.className = activeClass;
+        if (lecturerTopBar && vLecturer) vLecturer.appendChild(lecturerTopBar);
+        if (lecturerStageContainer && vLecturer) vLecturer.appendChild(lecturerStageContainer);
+        if (vLecturer) vLecturer.classList.remove('hidden');
+      } else if (role === 'student') {
+        if (tStudent) tStudent.className = activeClass;
+        [studentFormCard, studentWaitingCard, studentQuizController, studentAnswerSubmittedCard, studentResultCard].forEach(el => {
+          if (el && vStudent) vStudent.appendChild(el);
+        });
+        if (vStudent) vStudent.classList.remove('hidden');
+      } else if (role === 'demo') {
+        if (tDemo) tDemo.className = activeClass;
+
+        [studentFormCard, studentWaitingCard, studentQuizController, studentAnswerSubmittedCard, studentResultCard].forEach(el => {
+          if (el && demoStudentWrp) demoStudentWrp.appendChild(el);
+        });
+
+        if (lecturerTopBar && demoLecturerWrp) demoLecturerWrp.appendChild(lecturerTopBar);
+        if (lecturerStageContainer && demoLecturerWrp) demoLecturerWrp.appendChild(lecturerStageContainer);
+
+        if (vDemo) vDemo.classList.remove('hidden');
+      }
+
+      updateStudentViewForPhase();
+    }
+
+    function renderCustomizers() {
+      const avatarGrid = document.getElementById('avatarPickerGrid');
+      const colorGrid = document.getElementById('colorPickerGrid');
+
+      if (avatarGrid) {
+        avatarGrid.innerHTML = EMOJI_OPTIONS.map((emoji) => `
+          <button type="button" onclick="selectAvatarEmoji('${emoji}')" 
+                  class="avatar-btn h-11 rounded-xl bg-black/40 border border-white/20 hover:border-fuchsia-400 flex items-center justify-center text-xl transition ${selectedAvatar === emoji ? 'ring-2 ring-amber-400 bg-fuchsia-950/60 scale-105' : ''}">
+            ${emoji}
+          </button>
+        `).join('');
+      }
+
+      if (colorGrid) {
+        colorGrid.innerHTML = COLOR_OPTIONS.map((col) => `
+          <button type="button" onclick="selectColorSwatch('${col.id}')" 
+                  class="flex-1 h-8 rounded-xl ${col.bg} border-2 ${selectedColor.id === col.id ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-80 hover:opacity-100'} transition-all">
+          </button>
+        `).join('');
+      }
+    }
+
+    window.selectAvatarEmoji = function(emoji) {
+      selectedAvatar = emoji;
+      playSound('boing');
+      renderCustomizers();
+    };
+
+    window.selectColorSwatch = function(colorId) {
+      selectedColor = COLOR_OPTIONS.find(c => c.id === colorId) || COLOR_OPTIONS[0];
+      playSound('boing');
+      renderCustomizers();
+    };
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // App Initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      initFirebase();
+      renderCustomizers();
+      setGameState('LOBBY');
+      switchRole('lecturer');
+    });
+  </script>
+</body>
+</html>
