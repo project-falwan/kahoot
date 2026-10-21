@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="h-full">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Kahoot! Interactive Quiz & Real-Time Presence</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -12,11 +12,21 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <style>
-    body {
+    html, body {
       font-family: 'Inter', sans-serif;
       background-color: #250756;
       overflow-x: hidden;
+      touch-action: manipulation;
+      -webkit-text-size-adjust: 100%;
+      width: 100%;
+      min-height: 100%;
     }
+
+    /* Prevent iOS auto-zoom on input focus by maintaining minimum 16px font size */
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+
     .font-kahoot {
       font-family: 'Montserrat', sans-serif;
     }
@@ -50,13 +60,13 @@
         transform: translateY(0) scale(1) rotate(0deg);
       }
       30% {
-        transform: translateY(calc(var(--jump-height, -24px) * 0.3)) scaleX(1.08) scaleY(0.92) rotate(calc(var(--wiggle-deg, -4deg) * 0.5));
+        transform: translateY(calc(var(--jump-height, -20px) * 0.3)) scaleX(1.08) scaleY(0.92) rotate(calc(var(--wiggle-deg, -4deg) * 0.5));
       }
       50% {
-        transform: translateY(var(--jump-height, -24px)) scaleX(0.92) scaleY(1.08) rotate(var(--wiggle-deg, -4deg));
+        transform: translateY(var(--jump-height, -20px)) scaleX(0.92) scaleY(1.08) rotate(var(--wiggle-deg, -4deg));
       }
       70% {
-        transform: translateY(calc(var(--jump-height, -24px) * 0.2)) scaleX(1.04) scaleY(0.96) rotate(calc(var(--wiggle-deg, -4deg) * -0.5));
+        transform: translateY(calc(var(--jump-height, -20px) * 0.2)) scaleX(1.04) scaleY(0.96) rotate(calc(var(--wiggle-deg, -4deg) * -0.5));
       }
       85% {
         transform: translateY(0) scaleX(1.1) scaleY(0.88) rotate(0deg);
@@ -65,9 +75,9 @@
 
     @keyframes partySuperHop {
       0%, 100% { transform: translateY(0) scale(1) rotate(0deg); }
-      25% { transform: translateY(-28px) scale(1.1) rotate(-8deg); }
+      25% { transform: translateY(-24px) scale(1.1) rotate(-8deg); }
       50% { transform: translateY(-6px) scale(0.95) rotate(4deg); }
-      75% { transform: translateY(-32px) scale(1.12) rotate(10deg); }
+      75% { transform: translateY(-28px) scale(1.12) rotate(10deg); }
     }
 
     @keyframes avatarPopIn {
@@ -86,7 +96,6 @@
       50% { transform: translate(30px, -40px) scale(1.15); }
     }
 
-    /* Podium rise animation */
     @keyframes podiumRise {
       0% { transform: translateY(100%); opacity: 0; }
       100% { transform: translateY(0); opacity: 1; }
@@ -126,7 +135,7 @@
     ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.25); border-radius: 99px; }
   </style>
 </head>
-<body class="text-white min-h-screen flex flex-col antialiased selection:bg-fuchsia-500 selection:text-white bg-gradient-to-br from-[#3b0764] via-[#250756] to-[#13032d] relative">
+<body class="text-white min-h-screen flex flex-col antialiased selection:bg-fuchsia-500 selection:text-white bg-gradient-to-br from-[#3b0764] via-[#250756] to-[#13032d] relative max-w-full overflow-x-hidden">
 
   <!-- BACKGROUND AMBIENT PARTICLES -->
   <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
@@ -459,7 +468,7 @@
             
             <!-- JUARA 2 (Silver) -->
             <div class="flex-1 flex flex-col items-center podium-anim" style="animation-delay: 0.3s;">
-              <div class="w-16 h-16 rounded-2xl bg-slate-300 text-slate-900 flex items-center justify-center text-3xl font-black shadow-xl mb-2">
+              <div id="p2AvatarBox" class="w-16 h-16 rounded-2xl bg-slate-300 text-slate-900 flex items-center justify-center p-2 shadow-xl mb-2">
                 <span id="p2Avatar">🥈</span>
               </div>
               <span id="p2Name" class="text-xs font-black font-kahoot text-white truncate max-w-[90px]">Player 2</span>
@@ -471,7 +480,7 @@
 
             <!-- JUARA 1 (Gold) -->
             <div class="flex-1 flex flex-col items-center podium-anim" style="animation-delay: 0.6s;">
-              <div class="w-20 h-20 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center text-4xl font-black shadow-xl shadow-amber-400/40 mb-2 border-2 border-amber-200 ring-4 ring-amber-300/30">
+              <div id="p1AvatarBox" class="w-20 h-20 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center p-2 shadow-xl shadow-amber-400/40 mb-2 border-2 border-amber-200 ring-4 ring-amber-300/30">
                 <span id="p1Avatar">👑</span>
               </div>
               <span id="p1Name" class="text-sm font-black font-kahoot text-amber-300 truncate max-w-[110px]">Juara 1</span>
@@ -483,7 +492,7 @@
 
             <!-- JUARA 3 (Bronze) -->
             <div class="flex-1 flex flex-col items-center podium-anim" style="animation-delay: 0.1s;">
-              <div class="w-16 h-16 rounded-2xl bg-amber-700 text-amber-100 flex items-center justify-center text-3xl font-black shadow-xl mb-2">
+              <div id="p3AvatarBox" class="w-16 h-16 rounded-2xl bg-amber-700 text-amber-100 flex items-center justify-center p-2 shadow-xl mb-2">
                 <span id="p3Avatar">🥉</span>
               </div>
               <span id="p3Name" class="text-xs font-black font-kahoot text-white truncate max-w-[90px]">Player 3</span>
@@ -541,7 +550,7 @@
           </div>
 
           <div>
-            <label class="block text-xs font-bold text-fuchsia-300 uppercase tracking-wider mb-2">Pilih Avatar Emojimu</label>
+            <label class="block text-xs font-bold text-fuchsia-300 uppercase tracking-wider mb-2">Pilih Avatar Vector SVG</label>
             <div id="avatarPickerGrid" class="grid grid-cols-5 gap-2"></div>
           </div>
 
@@ -559,8 +568,8 @@
 
       <!-- STUDENT WAITING IN LOBBY CARD (STATE 2) -->
       <div id="studentWaitingCard" class="hidden bg-slate-900/90 backdrop-blur-xl border border-emerald-500/30 rounded-3xl p-8 shadow-2xl text-center space-y-6">
-        <div class="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-emerald-500/20 border border-emerald-500/40 text-5xl animate-bounce">
-          <span id="studentAvatarDisplay">🦊</span>
+        <div id="studentAvatarDisplayBox" class="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-emerald-500/20 border border-emerald-500/40 p-3 animate-bounce">
+          <img id="studentAvatarImg" src="" alt="Avatar" class="w-full h-full object-contain">
         </div>
 
         <div class="space-y-1">
@@ -689,8 +698,8 @@
     <div class="bg-slate-900 border border-white/20 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-6 text-center relative animate-pop-in">
       <button onclick="closeProfileModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white p-2 text-lg">✕</button>
 
-      <div id="modalAvatarBox" class="w-20 h-20 rounded-2xl bg-amber-400 mx-auto flex items-center justify-center text-4xl shadow-xl shadow-amber-400/30 animate-bounce">
-        🦊
+      <div id="modalAvatarBox" class="w-20 h-20 rounded-2xl bg-amber-400 mx-auto flex items-center justify-center p-3 shadow-xl shadow-amber-400/30 animate-bounce">
+        <img id="modalAvatarImg" src="" alt="Avatar" class="w-full h-full object-contain">
       </div>
 
       <div class="space-y-1">
@@ -773,8 +782,20 @@
     const LECTURER_PIN_DEFAULT = "0000";
     let isLecturerAuthenticated = false;
 
-    // Presets & DiceBear SVG integration
-    const EMOJI_OPTIONS = ['🦊', '🐯', '🚀', '👾', '🦄', '👑', '🐼', '⚡', '🍕', '🎯'];
+    // 🌟 DICEBEAR SVG AVATAR CATALOG FOR 100% CROSS-DEVICE CONSISTENCY
+    const AVATAR_OPTIONS = [
+      { id: 'fox', name: 'Fox', url: 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=Fox' },
+      { id: 'bot', name: 'Bot', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Bot' },
+      { id: 'cat', name: 'Cat', url: 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=Cat' },
+      { id: 'bear', name: 'Bear', url: 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=Bear' },
+      { id: 'hero', name: 'Hero', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Hero' },
+      { id: 'cool', name: 'Cool', url: 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=Cool' },
+      { id: 'star', name: 'Star', url: 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=Star' },
+      { id: 'alien', name: 'Alien', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Alien' },
+      { id: 'king', name: 'King', url: 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=King' },
+      { id: 'ghost', name: 'Ghost', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Ghost' }
+    ];
+
     const COLOR_OPTIONS = [
       { id: 'amber', bg: 'bg-amber-400', text: 'text-slate-950', border: 'border-amber-300' },
       { id: 'fuchsia', bg: 'bg-fuchsia-500', text: 'text-white', border: 'border-fuchsia-400' },
@@ -784,7 +805,7 @@
       { id: 'indigo', bg: 'bg-indigo-500', text: 'text-white', border: 'border-indigo-400' }
     ];
 
-    let selectedAvatar = EMOJI_OPTIONS[0];
+    let selectedAvatar = AVATAR_OPTIONS[0];
     let selectedColor = COLOR_OPTIONS[0];
 
     // State Variables
@@ -849,6 +870,15 @@
     window.openQuestionManagerModal = openQuestionManagerModal;
     window.closeQuestionManagerModal = closeQuestionManagerModal;
     window.handleAddQuestion = handleAddQuestion;
+
+    // Helper: Resolve SVG URL safely
+    function getAvatarUrl(avatarVal) {
+      if (!avatarVal) return AVATAR_OPTIONS[0].url;
+      if (typeof avatarVal === 'string' && avatarVal.startsWith('http')) return avatarVal;
+      const found = AVATAR_OPTIONS.find(a => a.id === avatarVal || a.url === avatarVal);
+      if (found) return found.url;
+      return `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${encodeURIComponent(avatarVal)}`;
+    }
 
     // -------------------------------------------------------------
     // AUDIO SYNTHESIZER
@@ -1073,7 +1103,7 @@
               id: docSnap.id,
               name: data.name || '',
               nim: data.nim || '',
-              avatar: data.avatar || '🦊',
+              avatar: data.avatar || AVATAR_OPTIONS[0].url,
               colorId: data.colorId || 'amber',
               isSpotlight: data.isSpotlight || false,
               score: data.score || 0,
@@ -1082,8 +1112,8 @@
               lastPointsGained: data.lastPointsGained || 0,
               bounceDelay: data.bounceDelay || (Math.random() * 1.5).toFixed(2) + 's',
               bounceDuration: data.bounceDuration || (1.4 + Math.random() * 0.9).toFixed(2) + 's',
-              jumpHeight: data.jumpHeight || (-14 - Math.floor(Math.random() * 14)) + 'px',
-              wiggleDeg: data.wiggleDeg || (-6 + Math.floor(Math.random() * 12)) + 'deg',
+              jumpHeight: data.jumpHeight || (-12 - Math.floor(Math.random() * 10)) + 'px',
+              wiggleDeg: data.wiggleDeg || (-5 + Math.floor(Math.random() * 10)) + 'deg',
               createdAt: data.createdAt ? data.createdAt.toDate() : new Date(data.timestamp || Date.now())
             });
           });
@@ -1214,8 +1244,8 @@
       }
     }
 
-    // 1. QUESTION PHASE LOGIC
-    function setupQuestionStage() {
+    // 1. QUESTION PHASE LOGIC (WITH RESET PREVIOUS ANSWERS BUG FIX)
+    async function setupQuestionStage() {
       const q = quizQuestions[currentQuestionIndex];
       document.getElementById('questionNumberBadge').innerText = `SOAL ${currentQuestionIndex + 1} DARI ${quizQuestions.length}`;
       document.getElementById('hostQuestionTitle').innerText = q.question;
@@ -1224,10 +1254,26 @@
       document.getElementById('hostOpt2').innerText = `C. ${q.options[2]}`;
       document.getElementById('hostOpt3').innerText = `D. ${q.options[3]}`;
 
+      // 🚨 CRITICAL FIX: RESET LAST ANSWER SO STUDENTS DON'T AUTO-ANSWER PREVIOUS SELECTION
       studentsList.forEach(s => {
         s.lastAnswerIndex = null;
         s.lastAnswerTime = 0;
       });
+
+      if (isFirebaseReady && attendancesCollection) {
+        try {
+          const snapshot = await getDocs(attendancesCollection);
+          const resetPromises = snapshot.docs.map(docSnap => 
+            updateDoc(doc(attendancesCollection, docSnap.id), {
+              lastAnswerIndex: null,
+              lastAnswerTime: 0
+            })
+          );
+          await Promise.all(resetPromises);
+        } catch (err) {
+          console.error("Gagal reset jawaban siswa di Firestore:", err);
+        }
+      }
 
       timerSeconds = q.timeLimit || 20;
       document.getElementById('questionTimerDisplay').innerText = timerSeconds;
@@ -1318,7 +1364,7 @@
             <span class="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 font-black font-kahoot flex items-center justify-center text-sm">
               #${idx + 1}
             </span>
-            <span class="text-2xl">${st.avatar}</span>
+            <img src="${getAvatarUrl(st.avatar)}" class="w-9 h-9 object-contain" alt="avatar">
             <div>
               <p class="font-black font-kahoot text-sm text-white">${escapeHtml(st.name)}</p>
               <p class="text-[10px] text-emerald-300 font-mono">+${st.lastPointsGained || 0} pts soal ini</p>
@@ -1335,20 +1381,20 @@
       fireConfetti(4.0);
 
       const sorted = [...studentsList].sort((a, b) => b.score - a.score);
-      const p1 = sorted[0] || { name: '-', avatar: '👑', score: 0 };
-      const p2 = sorted[1] || { name: '-', avatar: '🥈', score: 0 };
-      const p3 = sorted[2] || { name: '-', avatar: '🥉', score: 0 };
+      const p1 = sorted[0] || { name: '-', avatar: AVATAR_OPTIONS[0].url, score: 0 };
+      const p2 = sorted[1] || { name: '-', avatar: AVATAR_OPTIONS[1].url, score: 0 };
+      const p3 = sorted[2] || { name: '-', avatar: AVATAR_OPTIONS[2].url, score: 0 };
 
       document.getElementById('p1Name').innerText = p1.name;
-      document.getElementById('p1Avatar').innerText = p1.avatar;
+      document.getElementById('p1AvatarBox').innerHTML = `<img src="${getAvatarUrl(p1.avatar)}" class="w-full h-full object-contain" alt="p1">`;
       document.getElementById('p1Score').innerText = `${p1.score} pts`;
 
       document.getElementById('p2Name').innerText = p2.name;
-      document.getElementById('p2Avatar').innerText = p2.avatar;
+      document.getElementById('p2AvatarBox').innerHTML = `<img src="${getAvatarUrl(p2.avatar)}" class="w-full h-full object-contain" alt="p2">`;
       document.getElementById('p2Score').innerText = `${p2.score} pts`;
 
       document.getElementById('p3Name').innerText = p3.name;
-      document.getElementById('p3Avatar').innerText = p3.avatar;
+      document.getElementById('p3AvatarBox').innerHTML = `<img src="${getAvatarUrl(p3.avatar)}" class="w-full h-full object-contain" alt="p3">`;
       document.getElementById('p3Score').innerText = `${p3.score} pts`;
     }
 
@@ -1444,10 +1490,12 @@
       btn.disabled = true;
       btn.innerText = "Mengirim...";
 
+      const avatarUrl = selectedAvatar.url;
+
       const record = {
         name: name,
         nim: nim,
-        avatar: selectedAvatar,
+        avatar: avatarUrl,
         colorId: selectedColor.id,
         isSpotlight: false,
         score: 0,
@@ -1456,8 +1504,8 @@
         lastPointsGained: 0,
         bounceDelay: (Math.random() * 1.5).toFixed(2) + 's',
         bounceDuration: (1.4 + Math.random() * 0.9).toFixed(2) + 's',
-        jumpHeight: (-14 - Math.floor(Math.random() * 14)) + 'px',
-        wiggleDeg: (-6 + Math.floor(Math.random() * 12)) + 'deg',
+        jumpHeight: (-12 - Math.floor(Math.random() * 10)) + 'px',
+        wiggleDeg: (-5 + Math.floor(Math.random() * 10)) + 'deg',
         timestamp: Date.now(),
         createdAt: serverTimestamp()
       };
@@ -1476,7 +1524,7 @@
         }
 
         document.getElementById('studentFormCard').classList.add('hidden');
-        document.getElementById('studentAvatarDisplay').innerText = selectedAvatar;
+        document.getElementById('studentAvatarImg').src = avatarUrl;
         document.getElementById('studentNameDisplay').innerText = name;
 
         updateStudentViewForPhase();
@@ -1498,13 +1546,13 @@
       const names = ['Andi Wijaya', 'Siti Rahma', 'Rian Hidayat', 'Dian Permata', 'Eko Prasetyo', 'Maya Putri'];
       const randomName = names[Math.floor(Math.random() * names.length)] + ' ' + Math.floor(Math.random() * 90 + 10);
       const randomNim = '21' + Math.floor(10000000 + Math.random() * 90000000);
-      const randomAvatar = EMOJI_OPTIONS[Math.floor(Math.random() * EMOJI_OPTIONS.length)];
+      const randomAvatar = AVATAR_OPTIONS[Math.floor(Math.random() * AVATAR_OPTIONS.length)];
       const randomColor = COLOR_OPTIONS[Math.floor(Math.random() * COLOR_OPTIONS.length)];
 
       const record = {
         name: randomName,
         nim: randomNim,
-        avatar: randomAvatar,
+        avatar: randomAvatar.url,
         colorId: randomColor.id,
         isSpotlight: false,
         score: 0,
@@ -1513,8 +1561,8 @@
         lastPointsGained: 0,
         bounceDelay: (Math.random() * 1.5).toFixed(2) + 's',
         bounceDuration: (1.4 + Math.random() * 0.9).toFixed(2) + 's',
-        jumpHeight: (-14 - Math.floor(Math.random() * 14)) + 'px',
-        wiggleDeg: (-6 + Math.floor(Math.random() * 12)) + 'deg',
+        jumpHeight: (-12 - Math.floor(Math.random() * 10)) + 'px',
+        wiggleDeg: (-5 + Math.floor(Math.random() * 10)) + 'deg',
         timestamp: Date.now(),
         createdAt: serverTimestamp()
       };
@@ -1553,6 +1601,7 @@
       grid.innerHTML = studentsList.map((st) => {
         const colorObj = COLOR_OPTIONS.find(c => c.id === st.colorId) || COLOR_OPTIONS[0];
         const spotlightClass = st.isSpotlight ? 'spotlight-card border-amber-300 ring-4 ring-amber-400 scale-110' : '';
+        const imgUrl = getAvatarUrl(st.avatar);
 
         return `
           <div onclick="openProfileModal('${st.id}')" 
@@ -1560,8 +1609,8 @@
                style="--bounce-delay: ${st.bounceDelay}; --bounce-duration: ${st.bounceDuration}; --jump-height: ${st.jumpHeight}; --wiggle-deg: ${st.wiggleDeg};"
                class="avatar-hopping-card animate-pop-in cursor-pointer group relative bg-slate-900/85 backdrop-blur-md border ${colorObj.border} rounded-2xl p-3 flex flex-col items-center space-y-2 hover:scale-115 transition-transform shadow-xl ${spotlightClass}">
             
-            <div class="w-14 h-14 rounded-2xl ${colorObj.bg} ${colorObj.text} flex items-center justify-center text-3xl shadow-lg group-hover:rotate-12 transition-transform">
-              ${st.avatar}
+            <div class="w-14 h-14 rounded-2xl ${colorObj.bg} p-2 flex items-center justify-center shadow-lg group-hover:rotate-12 transition-transform">
+              <img src="${imgUrl}" alt="${escapeHtml(st.name)}" class="w-full h-full object-contain pointer-events-none">
             </div>
 
             <div class="text-center w-full px-1">
@@ -1657,7 +1706,7 @@
       if (!student) return;
 
       selectedStudentIdForModal = studentId;
-      document.getElementById('modalAvatarBox').innerText = student.avatar;
+      document.getElementById('modalAvatarImg').src = getAvatarUrl(student.avatar);
       document.getElementById('modalStudentName').innerText = student.name;
       document.getElementById('modalStudentNim').innerText = student.nim ? `NIM: ${student.nim}` : 'Mahasiswa';
 
@@ -1735,10 +1784,10 @@
       const colorGrid = document.getElementById('colorPickerGrid');
 
       if (avatarGrid) {
-        avatarGrid.innerHTML = EMOJI_OPTIONS.map((emoji) => `
-          <button type="button" onclick="selectAvatarEmoji('${emoji}')" 
-                  class="avatar-btn h-11 rounded-xl bg-black/40 border border-white/20 hover:border-fuchsia-400 flex items-center justify-center text-xl transition ${selectedAvatar === emoji ? 'ring-2 ring-amber-400 bg-fuchsia-950/60 scale-105' : ''}">
-            ${emoji}
+        avatarGrid.innerHTML = AVATAR_OPTIONS.map((item) => `
+          <button type="button" onclick="selectAvatarItem('${item.id}')" 
+                  class="avatar-btn h-12 p-1.5 rounded-xl bg-black/40 border border-white/20 hover:border-fuchsia-400 flex items-center justify-center transition ${selectedAvatar.id === item.id ? 'ring-2 ring-amber-400 bg-fuchsia-950/60 scale-105' : ''}">
+            <img src="${item.url}" alt="${item.name}" class="w-full h-full object-contain pointer-events-none">
           </button>
         `).join('');
       }
@@ -1752,8 +1801,8 @@
       }
     }
 
-    window.selectAvatarEmoji = function(emoji) {
-      selectedAvatar = emoji;
+    window.selectAvatarItem = function(avatarId) {
+      selectedAvatar = AVATAR_OPTIONS.find(a => a.id === avatarId) || AVATAR_OPTIONS[0];
       playSound('boing');
       renderCustomizers();
     };
