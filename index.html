@@ -504,12 +504,12 @@
             ✓ Terhubung Ke Room
           </span>
           <h2 id="studentNameDisplay" class="text-2xl font-black font-kahoot text-white">Budi Santoso</h2>
-          <p class="text-xs text-fuchsia-300">Siap-siap! Kuis akan muncul di layar ini.</p>
+          <p class="text-xs text-fuchsia-300">Siap-siap! Kuis akan muncul di layar ini secara otomatis.</p>
         </div>
 
         <div class="bg-black/40 border border-white/10 rounded-2xl p-4 text-xs text-slate-300 space-y-2">
           <p class="font-bold text-amber-300 text-sm">👀 Perhatikan Proyektor Layar Dosen!</p>
-          <p class="text-[11px] text-slate-400">Namamu sedang melompat di depan kelas. Saat kuis dimulai, 4 tombol jawaban akan muncul di bawah.</p>
+          <p class="text-[11px] text-slate-400">Namamu sedang melompat di depan kelas. Saat kuis dimulai oleh dosen, 4 tombol jawaban akan muncul di bawah secara real-time.</p>
         </div>
 
         <button onclick="resetStudentForm()" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition">
@@ -703,6 +703,7 @@
       doc, 
       getDocs, 
       updateDoc,
+      setDoc,
       serverTimestamp 
     } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -723,6 +724,7 @@
 
     let app, db, auth;
     let attendancesCollection = null;
+    let gameStateRef = null;
     let isFirebaseReady = false;
     let audioEnabled = true;
 
@@ -932,7 +934,7 @@
     }
 
     // -------------------------------------------------------------
-    // FIREBASE INITIALIZATION
+    // FIREBASE INITIALIZATION & REALTIME SYNC
     // -------------------------------------------------------------
     async function initFirebase() {
       try {
@@ -947,6 +949,8 @@
         }
 
         attendancesCollection = collection(db, 'artifacts', appId, 'public', 'data', 'attendances');
+        gameStateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSession', 'roomControl');
+
         setupRealtimeListener();
         isFirebaseReady = true;
         document.getElementById('syncStatus').innerText = "Live Synced";
@@ -958,52 +962,90 @@
     }
 
     function setupRealtimeListener() {
-      if (!attendancesCollection) return;
-      onSnapshot(attendancesCollection, (snapshot) => {
-        const docs = [];
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          docs.push({
-            id: docSnap.id,
-            name: data.name || '',
-            nim: data.nim || '',
-            avatar: data.avatar || '🦊',
-            colorId: data.colorId || 'amber',
-            isSpotlight: data.isSpotlight || false,
-            score: data.score || 0,
-            lastAnswerIndex: data.lastAnswerIndex ?? null,
-            lastAnswerTime: data.lastAnswerTime || 0,
-            bounceDelay: data.bounceDelay || (Math.random() * 1.5).toFixed(2) + 's',
-            bounceDuration: data.bounceDuration || (1.4 + Math.random() * 0.9).toFixed(2) + 's',
-            jumpHeight: data.jumpHeight || (-14 - Math.floor(Math.random() * 14)) + 'px',
-            wiggleDeg: data.wiggleDeg || (-6 + Math.floor(Math.random() * 12)) + 'deg',
-            createdAt: data.createdAt ? data.createdAt.toDate() : new Date(data.timestamp || Date.now())
+      // 1. Sync Presensi & Jawaban Mahasiswa
+      if (attendancesCollection) {
+        onSnapshot(attendancesCollection, (snapshot) => {
+          const docs = [];
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            docs.push({
+              id: docSnap.id,
+              name: data.name || '',
+              nim: data.nim || '',
+              avatar: data.avatar || '🦊',
+              colorId: data.colorId || 'amber',
+              isSpotlight: data.isSpotlight || false,
+              score: data.score || 0,
+              lastAnswerIndex: data.lastAnswerIndex ?? null,
+              lastAnswerTime: data.lastAnswerTime || 0,
+              lastPointsGained: data.lastPointsGained || 0,
+              bounceDelay: data.bounceDelay || (Math.random() * 1.5).toFixed(2) + 's',
+              bounceDuration: data.bounceDuration || (1.4 + Math.random() * 0.9).toFixed(2) + 's',
+              jumpHeight: data.jumpHeight || (-14 - Math.floor(Math.random() * 14)) + 'px',
+              wiggleDeg: data.wiggleDeg || (-6 + Math.floor(Math.random() * 12)) + 'deg',
+              createdAt: data.createdAt ? data.createdAt.toDate() : new Date(data.timestamp || Date.now())
+            });
           });
-        });
 
-        docs.sort((a, b) => a.createdAt - b.createdAt);
+          docs.sort((a, b) => a.createdAt - b.createdAt);
 
-        if (initialLoadDone) {
-          snapshot.docChanges().forEach((change) => {
-            if (change.type === 'added' && gameState === 'LOBBY') {
-              playSound('pop');
-              fireConfetti(1.2);
+          if (initialLoadDone) {
+            snapshot.docChanges().forEach((change) => {
+              if (change.type === 'added' && gameState === 'LOBBY') {
+                playSound('pop');
+                fireConfetti(1.2);
+              }
+            });
+          }
+
+          studentsList = docs;
+          initialLoadDone = true;
+
+          if (gameState === 'LOBBY') renderLobbyStage();
+          updateSubmittedCountUI();
+          updateStudentViewForPhase();
+        }, (err) => console.error("Error listening attendances:", err));
+      }
+
+      // 2. Sync Real-time Status Game (Fase Kuis) ke Seluruh HP/Layar
+      if (gameStateRef) {
+        onSnapshot(gameStateRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.state) {
+              currentQuestionIndex = data.currentQuestionIndex ?? currentQuestionIndex;
+              if (data.quizQuestions && Array.isArray(data.quizQuestions) && data.quizQuestions.length > 0) {
+                quizQuestions = data.quizQuestions;
+              }
+              applyGameStateLocally(data.state);
             }
-          });
-        }
-
-        studentsList = docs;
-        initialLoadDone = true;
-
-        if (gameState === 'LOBBY') renderLobbyStage();
-        updateSubmittedCountUI();
-      }, (err) => console.error(err));
+          }
+        }, (err) => console.error("Error listening gameState:", err));
+      }
     }
 
     // -------------------------------------------------------------
-    // KAHOOT GAME ENGINE STATE MACHINE
+    // KAHOOT GAME ENGINE STATE MACHINE & FIRESTORE SYNC
     // -------------------------------------------------------------
-    function setGameState(newState) {
+    async function setGameState(newState) {
+      applyGameStateLocally(newState);
+
+      // Push Perubahan Status Ke Firestore Realtime
+      if (isFirebaseReady && gameStateRef) {
+        try {
+          await setDoc(gameStateRef, {
+            state: newState,
+            currentQuestionIndex: currentQuestionIndex,
+            quizQuestions: quizQuestions,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        } catch (err) {
+          console.error("Gagal sinkronisasi gameState ke Firestore:", err);
+        }
+      }
+    }
+
+    function applyGameStateLocally(newState) {
       gameState = newState;
       
       const hostLobby = document.getElementById('hostLobbyPhase');
@@ -1012,6 +1054,8 @@
       const hostLeaderboard = document.getElementById('hostLeaderboardPhase');
       const hostPodium = document.getElementById('hostPodiumPhase');
       const gameBadge = document.getElementById('gamePhaseBadge');
+
+      if (!hostLobby) return;
 
       [hostLobby, hostQuestion, hostResult, hostLeaderboard, hostPodium].forEach(el => el.classList.add('hidden'));
 
@@ -1056,12 +1100,11 @@
     function handleHostMainAction() {
       if (gameState === 'LOBBY') {
         if (studentsList.length === 0) {
-          simulateStudentJoin(); // Auto add sample student if empty
+          simulateStudentJoin();
         }
         currentQuestionIndex = 0;
         setGameState('QUESTION');
       } else if (gameState === 'QUESTION') {
-        // Skip timer
         clearInterval(timerInterval);
         setGameState('RESULT');
       } else if (gameState === 'RESULT') {
@@ -1088,7 +1131,6 @@
       document.getElementById('hostOpt2').innerText = `C. ${q.options[2]}`;
       document.getElementById('hostOpt3').innerText = `D. ${q.options[3]}`;
 
-      // Reset Student Answers for current question
       studentsList.forEach(s => {
         s.lastAnswerIndex = null;
         s.lastAnswerTime = 0;
@@ -1115,11 +1157,10 @@
     }
 
     function updateSubmittedCountUI() {
-      const submitted = studentsList.filter(s => s.lastAnswerIndex !== null).length;
+      const submitted = studentsList.filter(s => s.lastAnswerIndex !== null && s.lastAnswerIndex !== undefined).length;
       document.getElementById('submittedCount').innerText = submitted;
       document.getElementById('totalStudentsCount').innerText = studentsList.length;
 
-      // Auto finish if all students answered
       if (gameState === 'QUESTION' && studentsList.length > 0 && submitted >= studentsList.length) {
         clearInterval(timerInterval);
         setTimeout(() => setGameState('RESULT'), 800);
@@ -1147,18 +1188,30 @@
         document.getElementById(`barVisual${i}`).style.height = `${heightPct}%`;
       }
 
-      const colors = ['🔺 Red', '🔷 Blue', '🟡 Yellow', '🟩 Green'];
+      const colors = ['🔺 Merah', '🔷 Biru', '🟡 Kuning', '🟩 Hijau'];
       document.getElementById('correctAnswerText').innerText = `${colors[q.correctIndex]}. ${q.options[q.correctIndex]}`;
 
-      // Calculate Scores
-      studentsList.forEach(s => {
+      // Kalkulasi Skor Kuis & Push ke Firestore
+      studentsList.forEach(async (s) => {
+        let gained = 0;
         if (s.lastAnswerIndex === q.correctIndex) {
-          // Speed Bonus: max 1000 points
-          const speedBonus = Math.max(100, Math.round(1000 - (s.lastAnswerTime * 40)));
-          s.score = (s.score || 0) + speedBonus;
-          s.lastPointsGained = speedBonus;
+          gained = Math.max(100, Math.round(1000 - (s.lastAnswerTime * 40)));
+          s.score = (s.score || 0) + gained;
+          s.lastPointsGained = gained;
         } else {
           s.lastPointsGained = 0;
+        }
+
+        if (isFirebaseReady && attendancesCollection && s.id && !s.id.startsWith('mem_')) {
+          try {
+            const studentRef = doc(db, 'artifacts', appId, 'public', 'data', 'attendances', s.id);
+            await updateDoc(studentRef, {
+              score: s.score,
+              lastPointsGained: s.lastPointsGained
+            });
+          } catch (e) {
+            console.error(e);
+          }
         }
       });
     }
@@ -1226,7 +1279,7 @@
         studentWaitingCard.classList.remove('hidden');
       } else if (gameState === 'QUESTION') {
         const me = getCurrentStudent();
-        if (me && me.lastAnswerIndex !== null) {
+        if (me && me.lastAnswerIndex !== null && me.lastAnswerIndex !== undefined) {
           studentAnswerSubmittedCard.classList.remove('hidden');
         } else {
           studentQuizController.classList.remove('hidden');
@@ -1259,7 +1312,7 @@
       return studentsList.find(s => s.id === currentStudentSessionId) || studentsList[0];
     }
 
-    function submitStudentAnswer(optionIndex) {
+    async function submitStudentAnswer(optionIndex) {
       const me = getCurrentStudent();
       if (!me) return;
 
@@ -1268,6 +1321,20 @@
       me.lastAnswerTime = timeSpent;
 
       playSound('pop');
+
+      // Sync Jawaban Mahasiswa Ke Firestore
+      if (isFirebaseReady && attendancesCollection && me.id && !me.id.startsWith('mem_')) {
+        try {
+          const studentRef = doc(db, 'artifacts', appId, 'public', 'data', 'attendances', me.id);
+          await updateDoc(studentRef, {
+            lastAnswerIndex: optionIndex,
+            lastAnswerTime: timeSpent
+          });
+        } catch (err) {
+          console.error("Gagal mengirim jawaban:", err);
+        }
+      }
+
       updateSubmittedCountUI();
       updateStudentViewForPhase();
     }
@@ -1297,6 +1364,7 @@
         score: 0,
         lastAnswerIndex: null,
         lastAnswerTime: 0,
+        lastPointsGained: 0,
         bounceDelay: (Math.random() * 1.5).toFixed(2) + 's',
         bounceDuration: (1.4 + Math.random() * 0.9).toFixed(2) + 's',
         jumpHeight: (-14 - Math.floor(Math.random() * 14)) + 'px',
@@ -1353,6 +1421,7 @@
         score: 0,
         lastAnswerIndex: null,
         lastAnswerTime: 0,
+        lastPointsGained: 0,
         bounceDelay: (Math.random() * 1.5).toFixed(2) + 's',
         bounceDuration: (1.4 + Math.random() * 0.9).toFixed(2) + 's',
         jumpHeight: (-14 - Math.floor(Math.random() * 14)) + 'px',
@@ -1680,7 +1749,6 @@
     window.addEventListener('DOMContentLoaded', () => {
       initFirebase();
       renderCustomizers();
-      setGameState('LOBBY');
       switchRole('lecturer');
     });
   </script>
