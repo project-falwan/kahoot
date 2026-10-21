@@ -34,6 +34,16 @@
     .btn-kahoot-green { background-color: #26890c; }
     .btn-kahoot-green:hover { background-color: #1e6d09; }
 
+    /* Shake Animation for Incorrect PIN */
+    @keyframes shakeError {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-10px); }
+      40%, 80% { transform: translateX(10px); }
+    }
+    .animate-shake {
+      animation: shakeError 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    }
+
     /* Continuous Hop animation for Student Avatars in Lobby */
     @keyframes kahootContinuousHop {
       0%, 100% {
@@ -128,6 +138,70 @@
   <!-- CONFETTI CANVAS OVERLAY -->
   <canvas id="confettiCanvas" class="fixed inset-0 pointer-events-none z-50 w-full h-full"></canvas>
 
+  <!-- 🚪 MODAL LOCK AWAL: SELECTOR PERAN & VERIFIKASI PIN DOSEN -->
+  <div id="roleLockModal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center p-4">
+    <div id="modalBox" class="bg-slate-900 border border-white/20 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl text-center space-y-6 animate-pop-in relative">
+      
+      <!-- Modal Logo Header -->
+      <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 via-fuchsia-500 to-indigo-500 mx-auto flex items-center justify-center text-slate-950 font-black text-3xl font-kahoot shadow-lg shadow-fuchsia-500/30 animate-bounce">
+        K!
+      </div>
+
+      <!-- STEP 1: ROLE CHOOSER -->
+      <div id="roleChooseStep" class="space-y-5">
+        <div class="space-y-1">
+          <h2 class="text-2xl font-black font-kahoot text-white">Selamat Datang!</h2>
+          <p class="text-xs text-fuchsia-200">Silakan pilih peran Anda untuk memulai sesi kuis.</p>
+        </div>
+
+        <div class="space-y-3 pt-2">
+          <button onclick="selectStudentRole()" class="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-fuchsia-600 to-indigo-600 hover:from-fuchsia-500 hover:to-indigo-500 text-white font-black font-kahoot text-base shadow-xl flex items-center justify-between transition group">
+            <span class="flex items-center gap-3">
+              <span class="text-2xl group-hover:scale-125 transition-transform">📱</span>
+              <span>Saya Mahasiswa</span>
+            </span>
+            <span class="text-xs bg-white/20 px-2.5 py-1 rounded-lg">Presensi & Kuis</span>
+          </button>
+
+          <button onclick="showPinStep()" class="w-full py-4 px-6 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-black font-kahoot text-base shadow-xl flex items-center justify-between transition group">
+            <span class="flex items-center gap-3">
+              <span class="text-2xl group-hover:scale-125 transition-transform">📺</span>
+              <span>Saya Dosen / Host</span>
+            </span>
+            <span class="text-xs bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2.5 py-1 rounded-lg">Perlu PIN 🔒</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 2: LECTURER PIN ENTERING -->
+      <div id="pinEnterStep" class="hidden space-y-5">
+        <div class="space-y-1">
+          <h3 class="text-xl font-black font-kahoot text-amber-300">Verifikasi Layar Dosen</h3>
+          <p class="text-xs text-slate-300">Masukkan PIN Keamanan untuk membuka Layar Dosen.</p>
+        </div>
+
+        <form onsubmit="verifyLecturerPIN(event)" class="space-y-4">
+          <div>
+            <input type="password" id="lecturerPinInput" maxlength="6" placeholder="Masukkan PIN (Default: 0000)" autofocus
+                   class="w-full text-center tracking-[0.5em] font-mono font-black text-2xl py-3 px-4 rounded-xl bg-black/60 border border-amber-400/50 text-amber-300 focus:outline-none focus:border-amber-400 transition">
+            <p id="pinErrorMsg" class="text-xs text-rose-400 font-bold mt-2 hidden">⚠️ PIN Salah! Gunakan PIN default: 0000</p>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <button type="button" onclick="backToRoleChoose()" class="flex-1 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 font-bold text-xs transition">
+              ← Kembali
+            </button>
+            <button type="submit" class="flex-1 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black font-kahoot text-xs shadow-lg shadow-amber-400/20 transition">
+              Masuk Dosen 🔑
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+
   <!-- APP NAVBAR -->
   <header class="bg-black/40 backdrop-blur-md border-b border-white/10 sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -135,7 +209,7 @@
         
         <!-- App Title -->
         <div class="flex items-center space-x-3">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-400 via-fuchsia-500 to-indigo-500 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-fuchsia-500/30 font-kahoot animate-bounce">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-400 via-fuchsia-500 to-indigo-500 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-fuchsia-500/30 font-kahoot">
             K!
           </div>
           <div>
@@ -146,29 +220,19 @@
           </div>
         </div>
 
-        <!-- Role Navigation Tabs -->
-        <div class="flex items-center bg-white/10 p-1 rounded-xl backdrop-blur-md border border-white/10 text-xs font-bold font-kahoot">
-          <button id="tabLecturer" onclick="switchRole('lecturer')" class="px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-white bg-fuchsia-600 shadow-md">
-            <span>📺 Layar Dosen</span>
-          </button>
-          <button id="tabStudent" onclick="switchRole('student')" class="px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-slate-300 hover:text-white">
-            <span>📱 Layar Mahasiswa</span>
-          </button>
-          <button id="tabDemo" onclick="switchRole('demo')" class="px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-slate-300 hover:text-white hidden sm:flex">
-            <span>⚡ Dual View</span>
-          </button>
-        </div>
-
-        <!-- Audio & Sync Indicator -->
+        <!-- Role Badge & Change Role Action -->
         <div class="flex items-center space-x-2">
+          <span id="currentRoleBadge" class="px-3 py-1 rounded-xl bg-fuchsia-600/30 border border-fuchsia-400/40 text-fuchsia-200 text-xs font-bold font-kahoot hidden sm:inline-block">
+            🎓 Mode Mahasiswa
+          </span>
+
+          <button onclick="openRoleModal()" class="px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/15 rounded-xl text-white text-xs font-bold font-kahoot transition flex items-center gap-1.5">
+            <span>🔄 Ganti Peran</span>
+          </button>
+
           <button id="soundToggleBtn" onclick="toggleAudio()" class="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-all flex items-center gap-1.5 text-xs font-semibold" title="Toggle Sound FX">
             <span id="soundIcon">🔊</span>
-            <span id="soundLabel" class="hidden md:inline text-[11px]">Suara On</span>
           </button>
-          <div class="hidden sm:flex items-center gap-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full text-[11px] font-bold font-mono">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-            <span id="syncStatus">Connected</span>
-          </div>
         </div>
 
       </div>
@@ -180,7 +244,7 @@
   <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col justify-center z-10 relative">
 
     <!-- 1. LECTURER / HOST VIEW -->
-    <div id="viewLecturer" class="w-full space-y-6">
+    <div id="viewLecturer" class="w-full space-y-6 hidden">
 
       <!-- TOP CONTROL BAR FOR HOST -->
       <div id="lecturerTopBar" class="bg-black/40 backdrop-blur-xl border border-white/15 rounded-3xl p-4 sm:p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-2xl">
@@ -436,7 +500,7 @@
         <div class="flex flex-col sm:flex-row items-center justify-between text-xs text-fuchsia-300/80 pt-4 border-t border-white/10 z-10 gap-2">
           <span id="stageFooterTip" class="flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-            💡 Hover / Klik pada avatar mahasiswa di lobby untuk interaksi sorotan
+            💡 Hover / Klik pada avatar mahasiswa di lobby untuk sorotan
           </span>
           <span id="lastJoinTicker" class="font-mono text-[11px] text-amber-300 font-semibold">Lobby Ready...</span>
         </div>
@@ -573,26 +637,6 @@
 
     </div>
 
-
-    <!-- 3. DEMO DUAL VIEW (SPLIT SCREEN) -->
-    <div id="viewDemo" class="hidden space-y-4">
-      <div class="bg-amber-500/20 border border-amber-500/40 rounded-2xl p-3 text-xs text-amber-200 flex items-center justify-between">
-        <span>💡 <b>Mode Dual View:</b> Layar HP Siswa (Kiri) & Layar Proyektor Dosen (Kanan) berjalan bersamaan!</span>
-      </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <div class="lg:col-span-5 bg-black/30 p-4 rounded-3xl border border-white/10">
-          <span class="text-xs font-bold font-kahoot text-fuchsia-300 uppercase block mb-3">📱 Layar HP Mahasiswa</span>
-          <div id="demoStudentWrapper"></div>
-        </div>
-
-        <div class="lg:col-span-7 bg-black/30 p-4 rounded-3xl border border-white/10">
-          <span class="text-xs font-bold font-kahoot text-amber-300 uppercase block mb-3">📺 Layar Proyektor Dosen</span>
-          <div id="demoLecturerWrapper"></div>
-        </div>
-      </div>
-    </div>
-
   </main>
 
 
@@ -606,9 +650,7 @@
       <p class="text-xs text-slate-300">Tambah atau sesuaikan soal kuis sebelum memulai kelas.</p>
 
       <!-- Existing Questions List -->
-      <div id="questionListContainer" class="space-y-3">
-        <!-- Dynamically rendered question list -->
-      </div>
+      <div id="questionListContainer" class="space-y-3"></div>
 
       <!-- Add Question Form -->
       <form id="addQuestionForm" onsubmit="handleAddQuestion(event)" class="bg-black/40 p-4 rounded-2xl border border-white/10 space-y-3 pt-3">
@@ -707,7 +749,7 @@
       serverTimestamp 
     } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // Global Config with User's Official Firebase Credentials
+    // Global Config with Credentials
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'project-falwan';
     const firebaseConfig = typeof __firebase_config !== 'undefined' 
       ? JSON.parse(__firebase_config) 
@@ -717,8 +759,7 @@
           projectId: "project-falwan",
           storageBucket: "project-falwan.firebasestorage.app",
           messagingSenderId: "127596650559",
-          appId: "1:127596650559:web:916ef9b549f0902498988a",
-          measurementId: "G-PRYNQDP8NQ"
+          appId: "1:127596650559:web:916ef9b549f0902498988a"
         };
     const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
@@ -728,7 +769,11 @@
     let isFirebaseReady = false;
     let audioEnabled = true;
 
-    // Presets
+    // Security & Auth State
+    const LECTURER_PIN_DEFAULT = "0000";
+    let isLecturerAuthenticated = false;
+
+    // Presets & DiceBear SVG integration
     const EMOJI_OPTIONS = ['🦊', '🐯', '🚀', '👾', '🦄', '👑', '🐼', '⚡', '🍕', '🎯'];
     const COLOR_OPTIONS = [
       { id: 'amber', bg: 'bg-amber-400', text: 'text-slate-950', border: 'border-amber-300' },
@@ -742,16 +787,15 @@
     let selectedAvatar = EMOJI_OPTIONS[0];
     let selectedColor = COLOR_OPTIONS[0];
 
-    // State
+    // State Variables
     let studentsList = [];
     let initialLoadDone = false;
     let selectedStudentIdForModal = null;
-    let currentRole = 'lecturer';
+    let currentRole = null; // 'student' | 'lecturer'
     let isPartyMode = false;
     let currentStudentSessionId = null;
 
     // GAME QUIZ ENGINE STATE
-    // Phases: 'LOBBY' | 'QUESTION' | 'RESULT' | 'LEADERBOARD' | 'PODIUM'
     let gameState = 'LOBBY'; 
     let currentQuestionIndex = 0;
     let timerSeconds = 20;
@@ -780,8 +824,12 @@
       }
     ];
 
-    // Expose Functions to Window
-    window.switchRole = switchRole;
+    // Expose Window Functions
+    window.openRoleModal = openRoleModal;
+    window.selectStudentRole = selectStudentRole;
+    window.showPinStep = showPinStep;
+    window.backToRoleChoose = backToRoleChoose;
+    window.verifyLecturerPIN = verifyLecturerPIN;
     window.handleStudentJoin = handleStudentJoin;
     window.simulateStudentJoin = simulateStudentJoin;
     window.openResetModal = openResetModal;
@@ -840,7 +888,7 @@
           osc.connect(gain); gain.connect(ctx.destination);
           osc.start(now); osc.stop(now + 0.05);
         } else if (type === 'correct') {
-          const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+          const notes = [523.25, 659.25, 783.99];
           notes.forEach((freq, idx) => {
             const o = ctx.createOscillator();
             const g = ctx.createGain();
@@ -884,7 +932,6 @@
     function toggleAudio() {
       audioEnabled = !audioEnabled;
       document.getElementById('soundIcon').innerText = audioEnabled ? '🔊' : '🔇';
-      document.getElementById('soundLabel').innerText = audioEnabled ? 'Suara On' : 'Suara Mute';
       if (audioEnabled) playSound('boing');
     }
 
@@ -934,6 +981,63 @@
     }
 
     // -------------------------------------------------------------
+    // ROLE SELECTOR & PIN AUTHENTICATION LOGIC
+    // -------------------------------------------------------------
+    function openRoleModal() {
+      document.getElementById('roleLockModal').classList.remove('hidden');
+      backToRoleChoose();
+    }
+
+    function selectStudentRole() {
+      currentRole = 'student';
+      document.getElementById('roleLockModal').classList.add('hidden');
+      document.getElementById('currentRoleBadge').innerText = "🎓 Mode Mahasiswa";
+      document.getElementById('viewLecturer').classList.add('hidden');
+      document.getElementById('viewStudent').classList.remove('hidden');
+      updateStudentViewForPhase();
+      playSound('pop');
+    }
+
+    function showPinStep() {
+      playSound('boing');
+      document.getElementById('roleChooseStep').classList.add('hidden');
+      document.getElementById('pinEnterStep').classList.remove('hidden');
+      document.getElementById('pinErrorMsg').classList.add('hidden');
+      document.getElementById('lecturerPinInput').value = '';
+      document.getElementById('lecturerPinInput').focus();
+    }
+
+    function backToRoleChoose() {
+      document.getElementById('pinEnterStep').classList.add('hidden');
+      document.getElementById('roleChooseStep').classList.remove('hidden');
+    }
+
+    function verifyLecturerPIN(e) {
+      e.preventDefault();
+      const inputPin = document.getElementById('lecturerPinInput').value.trim();
+      const modalBox = document.getElementById('modalBox');
+
+      if (inputPin === LECTURER_PIN_DEFAULT || isLecturerAuthenticated) {
+        isLecturerAuthenticated = true;
+        sessionStorage.setItem('lecturer_auth', 'true');
+        currentRole = 'lecturer';
+
+        document.getElementById('roleLockModal').classList.add('hidden');
+        document.getElementById('currentRoleBadge').innerText = "📺 Mode Dosen (Host)";
+        document.getElementById('viewStudent').classList.add('hidden');
+        document.getElementById('viewLecturer').classList.remove('hidden');
+        
+        playSound('fanfare');
+        renderLobbyStage();
+      } else {
+        playSound('wrong');
+        document.getElementById('pinErrorMsg').classList.remove('hidden');
+        modalBox.classList.add('animate-shake');
+        setTimeout(() => modalBox.classList.remove('animate-shake'), 500);
+      }
+    }
+
+    // -------------------------------------------------------------
     // FIREBASE INITIALIZATION & REALTIME SYNC
     // -------------------------------------------------------------
     async function initFirebase() {
@@ -953,16 +1057,13 @@
 
         setupRealtimeListener();
         isFirebaseReady = true;
-        document.getElementById('syncStatus').innerText = "Live Synced";
       } catch (err) {
         console.warn("Firestore fallback to local memory state:", err);
-        document.getElementById('syncStatus').innerText = "Demo Mode";
         isFirebaseReady = false;
       }
     }
 
     function setupRealtimeListener() {
-      // 1. Sync Presensi & Jawaban Mahasiswa
       if (attendancesCollection) {
         onSnapshot(attendancesCollection, (snapshot) => {
           const docs = [];
@@ -989,13 +1090,9 @@
 
           docs.sort((a, b) => a.createdAt - b.createdAt);
 
-          if (initialLoadDone) {
-            snapshot.docChanges().forEach((change) => {
-              if (change.type === 'added' && gameState === 'LOBBY') {
-                playSound('pop');
-                fireConfetti(1.2);
-              }
-            });
+          if (initialLoadDone && snapshot.docChanges().some(c => c.type === 'added') && gameState === 'LOBBY') {
+            playSound('pop');
+            fireConfetti(1.2);
           }
 
           studentsList = docs;
@@ -1007,7 +1104,6 @@
         }, (err) => console.error("Error listening attendances:", err));
       }
 
-      // 2. Sync Real-time Status Game (Fase Kuis) ke Seluruh HP/Layar
       if (gameStateRef) {
         onSnapshot(gameStateRef, (docSnap) => {
           if (docSnap.exists()) {
@@ -1030,7 +1126,6 @@
     async function setGameState(newState) {
       applyGameStateLocally(newState);
 
-      // Push Perubahan Status Ke Firestore Realtime
       if (isFirebaseReady && gameStateRef) {
         try {
           await setDoc(gameStateRef, {
@@ -1099,9 +1194,7 @@
 
     function handleHostMainAction() {
       if (gameState === 'LOBBY') {
-        if (studentsList.length === 0) {
-          simulateStudentJoin();
-        }
+        if (studentsList.length === 0) simulateStudentJoin();
         currentQuestionIndex = 0;
         setGameState('QUESTION');
       } else if (gameState === 'QUESTION') {
@@ -1191,7 +1284,6 @@
       const colors = ['🔺 Merah', '🔷 Biru', '🟡 Kuning', '🟩 Hijau'];
       document.getElementById('correctAnswerText').innerText = `${colors[q.correctIndex]}. ${q.options[q.correctIndex]}`;
 
-      // Kalkulasi Skor Kuis & Push ke Firestore
       studentsList.forEach(async (s) => {
         let gained = 0;
         if (s.lastAnswerIndex === q.correctIndex) {
@@ -1209,9 +1301,7 @@
               score: s.score,
               lastPointsGained: s.lastPointsGained
             });
-          } catch (e) {
-            console.error(e);
-          }
+          } catch (e) { console.error(e); }
         }
       });
     }
@@ -1266,6 +1356,8 @@
     // STUDENT CONTROLLER LOGIC
     // -------------------------------------------------------------
     function updateStudentViewForPhase() {
+      if (currentRole !== 'student') return;
+
       const studentWaitingCard = document.getElementById('studentWaitingCard');
       const studentQuizController = document.getElementById('studentQuizController');
       const studentAnswerSubmittedCard = document.getElementById('studentAnswerSubmittedCard');
@@ -1322,7 +1414,6 @@
 
       playSound('pop');
 
-      // Sync Jawaban Mahasiswa Ke Firestore
       if (isFirebaseReady && attendancesCollection && me.id && !me.id.startsWith('mem_')) {
         try {
           const studentRef = doc(db, 'artifacts', appId, 'public', 'data', 'attendances', me.id);
@@ -1330,9 +1421,7 @@
             lastAnswerIndex: optionIndex,
             lastAnswerTime: timeSpent
           });
-        } catch (err) {
-          console.error("Gagal mengirim jawaban:", err);
-        }
+        } catch (err) { console.error("Gagal mengirim jawaban:", err); }
       }
 
       updateSubmittedCountUI();
@@ -1641,67 +1730,6 @@
       playSound('pop');
     }
 
-    // -------------------------------------------------------------
-    // ROLE SWITCHING & CUSTOMIZERS
-    // -------------------------------------------------------------
-    function switchRole(role) {
-      currentRole = role;
-      const vLecturer = document.getElementById('viewLecturer');
-      const vStudent = document.getElementById('viewStudent');
-      const vDemo = document.getElementById('viewDemo');
-
-      const tLecturer = document.getElementById('tabLecturer');
-      const tStudent = document.getElementById('tabStudent');
-      const tDemo = document.getElementById('tabDemo');
-
-      const demoStudentWrp = document.getElementById('demoStudentWrapper');
-      const demoLecturerWrp = document.getElementById('demoLecturerWrapper');
-
-      const lecturerTopBar = document.getElementById('lecturerTopBar');
-      const lecturerStageContainer = document.getElementById('lecturerStageContainer');
-      const studentFormCard = document.getElementById('studentFormCard');
-      const studentWaitingCard = document.getElementById('studentWaitingCard');
-      const studentQuizController = document.getElementById('studentQuizController');
-      const studentAnswerSubmittedCard = document.getElementById('studentAnswerSubmittedCard');
-      const studentResultCard = document.getElementById('studentResultCard');
-
-      [tLecturer, tStudent, tDemo].forEach(btn => {
-        if (btn) btn.className = "px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-slate-300 hover:text-white";
-      });
-
-      const activeClass = "px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-white bg-fuchsia-600 shadow-md";
-
-      if (vLecturer) vLecturer.classList.add('hidden');
-      if (vStudent) vStudent.classList.add('hidden');
-      if (vDemo) vDemo.classList.add('hidden');
-
-      if (role === 'lecturer') {
-        if (tLecturer) tLecturer.className = activeClass;
-        if (lecturerTopBar && vLecturer) vLecturer.appendChild(lecturerTopBar);
-        if (lecturerStageContainer && vLecturer) vLecturer.appendChild(lecturerStageContainer);
-        if (vLecturer) vLecturer.classList.remove('hidden');
-      } else if (role === 'student') {
-        if (tStudent) tStudent.className = activeClass;
-        [studentFormCard, studentWaitingCard, studentQuizController, studentAnswerSubmittedCard, studentResultCard].forEach(el => {
-          if (el && vStudent) vStudent.appendChild(el);
-        });
-        if (vStudent) vStudent.classList.remove('hidden');
-      } else if (role === 'demo') {
-        if (tDemo) tDemo.className = activeClass;
-
-        [studentFormCard, studentWaitingCard, studentQuizController, studentAnswerSubmittedCard, studentResultCard].forEach(el => {
-          if (el && demoStudentWrp) demoStudentWrp.appendChild(el);
-        });
-
-        if (lecturerTopBar && demoLecturerWrp) demoLecturerWrp.appendChild(lecturerTopBar);
-        if (lecturerStageContainer && demoLecturerWrp) demoLecturerWrp.appendChild(lecturerStageContainer);
-
-        if (vDemo) vDemo.classList.remove('hidden');
-      }
-
-      updateStudentViewForPhase();
-    }
-
     function renderCustomizers() {
       const avatarGrid = document.getElementById('avatarPickerGrid');
       const colorGrid = document.getElementById('colorPickerGrid');
@@ -1749,7 +1777,14 @@
     window.addEventListener('DOMContentLoaded', () => {
       initFirebase();
       renderCustomizers();
-      switchRole('lecturer');
+      
+      // Auto-load auth session if already verified
+      if (sessionStorage.getItem('lecturer_auth') === 'true') {
+        isLecturerAuthenticated = true;
+      }
+
+      // Show Initial Role Lock Modal
+      openRoleModal();
     });
   </script>
 </body>
