@@ -777,6 +777,19 @@
     let gameStateRef = null;
     let isFirebaseReady = false;
     let audioEnabled = true;
+    const lobbyMusic = new Audio('./lobby.mp3');
+    lobbyMusic.loop = true;
+    lobbyMusic.volume = 0.35;
+    lobbyMusic.preload = 'auto';
+    const countdownAudio = new Audio('./countdown.mp3');
+    countdownAudio.preload = 'auto';
+
+    lobbyMusic.addEventListener('error', () => {
+      console.error('Gagal memuat lobby.mp3. Pastikan file tersedia di root proyek.');
+    });
+    countdownAudio.addEventListener('error', () => {
+      console.error('Gagal memuat countdown.mp3. Pastikan file tersedia di root proyek.');
+    });
 
     // Security & Auth State
     const LECTURER_PIN_DEFAULT = "0000";
@@ -959,10 +972,44 @@
 
     function hoverAvatarSound() { playSound('boing'); }
 
+    function startLobbyMusic() {
+      if (!audioEnabled || currentRole !== 'lecturer' || gameState !== 'LOBBY' || !lobbyMusic.paused) return;
+
+      const playback = lobbyMusic.play();
+      if (playback) {
+        playback.catch(err => console.warn('Musik lobby tidak dapat diputar:', err));
+      }
+    }
+
+    function stopLobbyMusic() {
+      lobbyMusic.pause();
+      lobbyMusic.currentTime = 0;
+    }
+
+    function playCountdownSound() {
+      if (!audioEnabled) return;
+
+      countdownAudio.currentTime = 0;
+      const playback = countdownAudio.play();
+      if (playback) {
+        playback.catch(err => {
+          console.warn('Audio countdown tidak dapat diputar; menggunakan bunyi bawaan:', err);
+          playSound('tick');
+        });
+      }
+    }
+
     function toggleAudio() {
       audioEnabled = !audioEnabled;
       document.getElementById('soundIcon').innerText = audioEnabled ? '🔊' : '🔇';
-      if (audioEnabled) playSound('boing');
+      if (audioEnabled) {
+        playSound('boing');
+        startLobbyMusic();
+      } else {
+        stopLobbyMusic();
+        countdownAudio.pause();
+        countdownAudio.currentTime = 0;
+      }
     }
 
     // -------------------------------------------------------------
@@ -1014,11 +1061,13 @@
     // ROLE SELECTOR & PIN AUTHENTICATION LOGIC
     // -------------------------------------------------------------
     function openRoleModal() {
+      stopLobbyMusic();
       document.getElementById('roleLockModal').classList.remove('hidden');
       backToRoleChoose();
     }
 
     function selectStudentRole() {
+      stopLobbyMusic();
       currentRole = 'student';
       document.getElementById('roleLockModal').classList.add('hidden');
       document.getElementById('currentRoleBadge').innerText = "🎓 Mode Mahasiswa";
@@ -1059,6 +1108,7 @@
         
         playSound('fanfare');
         renderLobbyStage();
+        startLobbyMusic();
       } else {
         playSound('wrong');
         document.getElementById('pinErrorMsg').classList.remove('hidden');
@@ -1172,6 +1222,8 @@
 
     function applyGameStateLocally(newState) {
       gameState = newState;
+      if (newState === 'LOBBY') startLobbyMusic();
+      else stopLobbyMusic();
       
       const hostLobby = document.getElementById('hostLobbyPhase');
       const hostQuestion = document.getElementById('hostQuestionPhase');
@@ -1286,7 +1338,7 @@
       timerInterval = setInterval(() => {
         timerSeconds--;
         document.getElementById('questionTimerDisplay').innerText = timerSeconds;
-        if (timerSeconds <= 5) playSound('tick');
+        if (timerSeconds <= 5 && timerSeconds > 0) playCountdownSound();
 
         if (timerSeconds <= 0) {
           clearInterval(timerInterval);
