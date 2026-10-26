@@ -191,9 +191,9 @@
 
         <form onsubmit="verifyLecturerPIN(event)" class="space-y-4">
           <div>
-            <input type="password" id="lecturerPinInput" maxlength="6" placeholder="Masukkan PIN (Default: 0000)" autofocus
+            <input type="password" id="lecturerPinInput" maxlength="6" placeholder="Masukkan PIN" autofocus
                    class="w-full text-center tracking-[0.5em] font-mono font-black text-2xl py-3 px-4 rounded-xl bg-black/60 border border-amber-400/50 text-amber-300 focus:outline-none focus:border-amber-400 transition">
-            <p id="pinErrorMsg" class="text-xs text-rose-400 font-bold mt-2 hidden">⚠️ PIN Salah! Gunakan PIN default: 0000</p>
+            <p id="pinErrorMsg" class="text-xs text-rose-400 font-bold mt-2 hidden">⚠️ PIN salah. Silakan coba lagi.</p>
           </div>
 
           <div class="flex items-center gap-3">
@@ -651,7 +651,18 @@
       <button onclick="closeQuestionManagerModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white p-2">✕</button>
 
       <h3 class="text-xl font-black font-kahoot text-amber-300">⚙️ Bank Soal Kuis Dosen</h3>
-      <p class="text-xs text-slate-300">Tambah atau sesuaikan soal kuis sebelum memulai kelas.</p>
+      <p class="text-xs text-slate-300">Bank soal tersimpan di Firestore dan tetap tersedia setelah halaman dimuat ulang.</p>
+
+      <div class="flex flex-wrap gap-2">
+        <button type="button" onclick="exportQuestionBank()" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold">
+          ⬇️ Ekspor JSON
+        </button>
+        <button type="button" onclick="document.getElementById('questionBankJsonInput').click()" class="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold">
+          ⬆️ Impor JSON
+        </button>
+        <input type="file" id="questionBankJsonInput" accept=".json,application/json" class="hidden" onchange="importQuestionBank(event)">
+      </div>
+      <p id="questionBankStatus" role="status" aria-live="polite" class="text-xs text-slate-300"></p>
 
       <!-- Existing Questions List -->
       <div id="questionListContainer" class="space-y-3"></div>
@@ -677,6 +688,12 @@
             <option value="2">🟡 Kuning</option>
             <option value="3">🟩 Hijau</option>
           </select>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <label for="newQuestionTimeLimit" class="text-xs font-bold text-slate-300">Timer (detik):</label>
+          <input type="number" id="newQuestionTimeLimit" min="1" max="300" step="1" value="10" required class="w-24 p-2 rounded-xl bg-slate-800 border border-white/20 text-xs text-amber-300 font-bold">
+          <span class="text-[11px] text-slate-400">Default 10 detik</span>
         </div>
 
         <button type="submit" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold font-kahoot shadow-lg">
@@ -750,6 +767,7 @@
       getDocs, 
       updateDoc,
       setDoc,
+      getDoc,
       serverTimestamp 
     } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -770,6 +788,8 @@
     let app, db, auth;
     let attendancesCollection = null;
     let gameStateRef = null;
+    let quizBankRef = null;
+    let firebaseInitialization = null;
     let isFirebaseReady = false;
     let audioEnabled = true;
     const lobbyMusic = new Audio('./lobby.mp3');
@@ -824,12 +844,14 @@
     let isPartyMode = false;
     let currentStudentSessionId = null;
     const STUDENT_SESSION_KEY = 'kahoot_student_session_id';
+    let questionBankSaveQueue = Promise.resolve();
 
     // GAME QUIZ ENGINE STATE
     let gameState = 'LOBBY'; 
     let currentQuestionIndex = 0;
     let timerSeconds = 20;
     let timerInterval = null;
+    let resultTransitionTimeout = null;
     let activeQuestionIndex = null;
     let questionStartTime = 0;
 
@@ -839,19 +861,19 @@
         question: "Bahasa Pemrograman apa yang digunakan untuk membuat logika interaktif di browser web?",
         options: ["Python", "JavaScript", "C++", "HTML"],
         correctIndex: 1,
-        timeLimit: 20
+        timeLimit: 10
       },
       {
         question: "Manakah sintaks yang benar untuk membuat variabel di JavaScript modern?",
         options: ["var_num x = 5", "const x = 5", "dim x = 5", "create x = 5"],
         correctIndex: 1,
-        timeLimit: 20
+        timeLimit: 10
       },
       {
         question: "Metode Array mana yang digunakan untuk menambah elemen baru di akhir array?",
         options: ["pop()", "push()", "shift()", "unshift()"],
         correctIndex: 1,
-        timeLimit: 20
+        timeLimit: 10
       }
     ];
 
@@ -880,6 +902,9 @@
     window.openQuestionManagerModal = openQuestionManagerModal;
     window.closeQuestionManagerModal = closeQuestionManagerModal;
     window.handleAddQuestion = handleAddQuestion;
+    window.updateQuestionTimeLimit = updateQuestionTimeLimit;
+    window.exportQuestionBank = exportQuestionBank;
+    window.importQuestionBank = importQuestionBank;
 
     // Helper: Resolve SVG URL safely
     function getAvatarUrl(avatarVal) {
@@ -1131,14 +1156,118 @@
 
         attendancesCollection = collection(db, 'artifacts', appId, 'public', 'data', 'attendances');
         gameStateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSession', 'roomControl');
+        quizBankRef = doc(db, 'artifacts', appId, 'public', 'data', 'quizBanks', 'default');
 
         await removePreviousStudentSession();
+        await loadQuestionBank();
         setupRealtimeListener();
         isFirebaseReady = true;
       } catch (err) {
         console.warn("Firestore fallback to local memory state:", err);
         isFirebaseReady = false;
       }
+    }
+
+    function normalizeQuestionBank(rawQuestions) {
+      if (!Array.isArray(rawQuestions) || rawQuestions.length === 0 || rawQuestions.length > 500) {
+        throw new Error('Bank JSON harus berisi 1 sampai 500 soal.');
+      }
+
+      const questions = rawQuestions.map((item, index) => {
+        const question = typeof item?.question === 'string' ? item.question.trim() : '';
+        const options = Array.isArray(item?.options)
+          ? item.options.map(option => typeof option === 'string' ? option.trim() : '')
+          : [];
+        const correctIndex = Number(item?.correctIndex);
+        const timeLimit = item?.timeLimit === undefined || item.timeLimit === null || item.timeLimit === ''
+          ? 10
+          : Number(item.timeLimit);
+
+        if (!question || options.length !== 4 || options.some(option => !option)) {
+          throw new Error(`Soal ${index + 1} harus memiliki pertanyaan dan tepat 4 opsi yang terisi.`);
+        }
+        if (!Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex > 3) {
+          throw new Error(`Kunci jawaban soal ${index + 1} harus berupa angka 0 sampai 3.`);
+        }
+        if (!Number.isInteger(timeLimit) || timeLimit < 1 || timeLimit > 300) {
+          throw new Error(`Timer soal ${index + 1} harus berupa angka 1 sampai 300 detik.`);
+        }
+
+        return { question, options, correctIndex, timeLimit };
+      });
+      if (new Blob([JSON.stringify(questions)]).size > 900 * 1024) {
+        throw new Error('Ukuran bank soal melebihi batas aman Firestore (900 KB).');
+      }
+      return questions;
+    }
+
+    async function loadQuestionBank() {
+      if (!quizBankRef) return;
+
+      try {
+        const bankSnapshot = await getDoc(quizBankRef);
+        if (bankSnapshot.exists()) {
+          quizQuestions = normalizeQuestionBank(bankSnapshot.data().questions);
+          setQuestionBankStatus('Bank soal berhasil dimuat dari Firestore.', 'success');
+        } else {
+          quizQuestions = normalizeQuestionBank(quizQuestions);
+          await setDoc(quizBankRef, {
+            name: 'Bank Soal Utama',
+            questions: quizQuestions,
+            updatedAt: serverTimestamp()
+          });
+          setQuestionBankStatus('Bank soal awal tersimpan di Firestore.', 'success');
+        }
+        refreshQuestionBankUI();
+      } catch (err) {
+        console.error('Gagal memuat atau membuat bank soal Firestore:', err);
+        setQuestionBankStatus(`Bank soal belum dapat dimuat/disimpan: ${err.message}`, 'error');
+      }
+    }
+
+    function setQuestionBankStatus(message, type = 'info') {
+      const status = document.getElementById('questionBankStatus');
+      if (!status) return;
+      status.innerText = message;
+      status.className = `text-xs ${type === 'error' ? 'text-rose-300' : type === 'success' ? 'text-emerald-300' : 'text-slate-300'}`;
+    }
+
+    function persistQuestionBank() {
+      if (!isFirebaseReady || !quizBankRef) {
+        setQuestionBankStatus('Firestore belum siap. Perubahan ini belum tersimpan permanen.', 'error');
+        return Promise.resolve(false);
+      }
+
+      let questionsToSave;
+      try {
+        questionsToSave = normalizeQuestionBank(quizQuestions);
+      } catch (err) {
+        console.error('Bank soal tidak dapat disimpan:', err);
+        setQuestionBankStatus(`Bank soal tidak dapat disimpan: ${err.message}`, 'error');
+        return Promise.resolve(false);
+      }
+
+      questionBankSaveQueue = questionBankSaveQueue.then(async () => {
+        await setDoc(quizBankRef, {
+          name: 'Bank Soal Utama',
+          questions: questionsToSave,
+          updatedAt: serverTimestamp()
+        });
+        setQuestionBankStatus('Perubahan bank soal tersimpan di Firestore.', 'success');
+        return true;
+      }).catch(err => {
+        console.error('Gagal menyimpan bank soal ke Firestore:', err);
+        setQuestionBankStatus(`Gagal menyimpan bank soal: ${err.message}`, 'error');
+        return false;
+      });
+
+      return questionBankSaveQueue;
+    }
+
+    function refreshQuestionBankUI() {
+      renderQuestionManagerList();
+      const progressText = document.getElementById('quizProgressText');
+      if (progressText) progressText.innerText = `Bank Soal: ${quizQuestions.length} Soal Ready`;
     }
 
     async function removePreviousStudentSession() {
@@ -1199,7 +1328,7 @@
             const data = docSnap.data();
             if (data.state) {
               currentQuestionIndex = data.currentQuestionIndex ?? currentQuestionIndex;
-              if (data.quizQuestions && Array.isArray(data.quizQuestions) && data.quizQuestions.length > 0) {
+              if (data.state !== 'LOBBY' && data.quizQuestions && Array.isArray(data.quizQuestions) && data.quizQuestions.length > 0) {
                 quizQuestions = data.quizQuestions;
               }
               applyGameStateLocally(data.state);
@@ -1233,6 +1362,8 @@
       if (newState !== 'QUESTION') {
         if (timerInterval) clearInterval(timerInterval);
         timerInterval = null;
+        if (resultTransitionTimeout !== null) clearTimeout(resultTransitionTimeout);
+        resultTransitionTimeout = null;
         activeQuestionIndex = null;
         countdownAudio.pause();
         countdownAudio.currentTime = 0;
@@ -1325,7 +1456,7 @@
       document.getElementById('hostOpt1').innerText = `B. ${q.options[1]}`;
       document.getElementById('hostOpt2').innerText = `C. ${q.options[2]}`;
       document.getElementById('hostOpt3').innerText = `D. ${q.options[3]}`;
-      timerSeconds = q.timeLimit || 20;
+      timerSeconds = q.timeLimit || 10;
       document.getElementById('questionTimerDisplay').innerText = timerSeconds;
       playCountdownSound();
 
@@ -1352,7 +1483,7 @@
 
       if (gameState !== 'QUESTION' || activeQuestionIndex !== currentQuestionIndex) return;
 
-      timerSeconds = q.timeLimit || 20;
+      timerSeconds = q.timeLimit || 10;
       document.getElementById('questionTimerDisplay').innerText = timerSeconds;
       questionStartTime = Date.now();
       updateSubmittedCountUI();
@@ -1377,9 +1508,13 @@
       document.getElementById('submittedCount').innerText = submitted;
       document.getElementById('totalStudentsCount').innerText = studentsList.length;
 
-      if (gameState === 'QUESTION' && studentsList.length > 0 && submitted >= studentsList.length) {
+      if (gameState === 'QUESTION' && studentsList.length > 0 && submitted >= studentsList.length && resultTransitionTimeout === null) {
         clearInterval(timerInterval);
-        setTimeout(() => setGameState('RESULT'), 800);
+        timerInterval = null;
+        resultTransitionTimeout = setTimeout(() => {
+          resultTransitionTimeout = null;
+          if (gameState === 'QUESTION') setGameState('RESULT');
+        }, 800);
       }
     }
 
@@ -1740,8 +1875,10 @@
     // -------------------------------------------------------------
     // QUESTION MANAGER MODAL LOGIC
     // -------------------------------------------------------------
-    function openQuestionManagerModal() {
+    async function openQuestionManagerModal() {
+      if (!isFirebaseReady && firebaseInitialization) await firebaseInitialization;
       renderQuestionManagerList();
+      if (!isFirebaseReady) setQuestionBankStatus('Firestore tidak tersedia. Perubahan bank soal belum bisa disimpan permanen.', 'error');
       document.getElementById('questionManagerModal').classList.remove('hidden');
     }
 
@@ -1752,45 +1889,118 @@
     function renderQuestionManagerList() {
       const container = document.getElementById('questionListContainer');
       container.innerHTML = quizQuestions.map((q, idx) => `
-        <div class="bg-black/40 p-3 rounded-2xl border border-white/10 flex items-center justify-between text-xs">
-          <div>
+        <div class="bg-black/40 p-3 rounded-2xl border border-white/10 flex items-center justify-between gap-3 text-xs">
+          <div class="min-w-0">
             <span class="font-black text-amber-300 font-kahoot block">Soal ${idx + 1}: ${escapeHtml(q.question)}</span>
             <span class="text-[11px] text-slate-400">Kunci: ${['🔺 Merah', '🔷 Biru', '🟡 Kuning', '🟩 Hijau'][q.correctIndex]}</span>
           </div>
-          ${quizQuestions.length > 1 ? `<button onclick="deleteQuestion(${idx})" class="p-1.5 text-rose-400 hover:text-rose-200">🗑️</button>` : ''}
+          <div class="flex items-center gap-2 shrink-0">
+            <label for="questionTimeLimit${idx}" class="text-[10px] text-slate-300">Detik</label>
+            <input type="number" id="questionTimeLimit${idx}" min="1" max="300" step="1" value="${q.timeLimit || 10}" onchange="updateQuestionTimeLimit(${idx}, this.value)" class="w-16 p-1.5 rounded-lg bg-slate-800 border border-white/20 text-center text-amber-300 font-bold">
+            ${quizQuestions.length > 1 ? `<button onclick="deleteQuestion(${idx})" class="p-1.5 text-rose-400 hover:text-rose-200" title="Hapus soal">🗑️</button>` : ''}
+          </div>
         </div>
       `).join('');
     }
 
-    window.deleteQuestion = function(index) {
+    window.deleteQuestion = async function(index) {
       if (quizQuestions.length <= 1) return;
       quizQuestions.splice(index, 1);
-      renderQuestionManagerList();
-      document.getElementById('quizProgressText').innerText = `Bank Soal: ${quizQuestions.length} Soal Ready`;
+      refreshQuestionBankUI();
+      await persistQuestionBank();
     };
 
-    function handleAddQuestion(e) {
+    async function updateQuestionTimeLimit(index, rawValue) {
+      const timeLimit = Number(rawValue);
+      if (!Number.isInteger(timeLimit) || timeLimit < 1 || timeLimit > 300 || !quizQuestions[index]) {
+        setQuestionBankStatus('Timer harus berupa angka 1 sampai 300 detik.', 'error');
+        renderQuestionManagerList();
+        return;
+      }
+
+      quizQuestions[index].timeLimit = timeLimit;
+      await persistQuestionBank();
+    }
+
+    async function handleAddQuestion(e) {
       e.preventDefault();
       const title = document.getElementById('newQTitle').value.trim();
       const opt0 = document.getElementById('newOpt0').value.trim();
       const opt1 = document.getElementById('newOpt1').value.trim();
       const opt2 = document.getElementById('newOpt2').value.trim();
       const opt3 = document.getElementById('newOpt3').value.trim();
-      const correct = parseInt(document.getElementById('newCorrectIndex').value);
+      const correct = Number(document.getElementById('newCorrectIndex').value);
+      const timeLimit = Number(document.getElementById('newQuestionTimeLimit').value || 10);
 
       if (!title || !opt0 || !opt1 || !opt2 || !opt3) return;
+      if (!Number.isInteger(timeLimit) || timeLimit < 1 || timeLimit > 300) {
+        setQuestionBankStatus('Timer harus berupa angka 1 sampai 300 detik.', 'error');
+        return;
+      }
 
       quizQuestions.push({
         question: title,
         options: [opt0, opt1, opt2, opt3],
         correctIndex: correct,
-        timeLimit: 20
+        timeLimit
       });
 
       document.getElementById('addQuestionForm').reset();
-      renderQuestionManagerList();
-      document.getElementById('quizProgressText').innerText = `Bank Soal: ${quizQuestions.length} Soal Ready`;
+      refreshQuestionBankUI();
+      await persistQuestionBank();
       playSound('pop');
+    }
+
+    function exportQuestionBank() {
+      try {
+        const exportData = {
+          format: 'kahoot-interactive-quiz-bank',
+          version: 1,
+          name: 'Bank Soal Utama',
+          exportedAt: new Date().toISOString(),
+          questions: normalizeQuestionBank(quizQuestions)
+        };
+        const file = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(file);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'bank-soal-kahoot.json';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setQuestionBankStatus('Bank soal berhasil diekspor ke JSON.', 'success');
+      } catch (err) {
+        console.error('Gagal mengekspor bank soal JSON:', err);
+        setQuestionBankStatus(`JSON tidak dapat diekspor: ${err.message}`, 'error');
+      }
+    }
+
+    async function importQuestionBank(event) {
+      const input = event.target;
+      const file = input.files?.[0];
+      if (!file) return;
+
+      try {
+        if (file.size > 2 * 1024 * 1024) throw new Error('Ukuran file JSON maksimal 2 MB.');
+        const parsed = JSON.parse(await file.text());
+        const rawQuestions = Array.isArray(parsed) ? parsed : parsed?.questions;
+        const importedQuestions = normalizeQuestionBank(rawQuestions);
+        if (!window.confirm(`Ganti bank soal saat ini dengan ${importedQuestions.length} soal dari file JSON?`)) return;
+        quizQuestions = importedQuestions;
+        refreshQuestionBankUI();
+        const saved = await persistQuestionBank();
+        setQuestionBankStatus(
+          saved ? `${importedQuestions.length} soal berhasil diimpor dan disimpan.` : `${importedQuestions.length} soal diimpor, tetapi belum tersimpan permanen.`,
+          saved ? 'success' : 'error'
+        );
+        playSound('pop');
+      } catch (err) {
+        console.error('Gagal mengimpor bank soal JSON:', err);
+        setQuestionBankStatus(`JSON tidak dapat diimpor: ${err.message}`, 'error');
+      } finally {
+        input.value = '';
+      }
     }
 
     // -------------------------------------------------------------
@@ -1920,7 +2130,7 @@
     // App Initialization
     window.addEventListener('DOMContentLoaded', () => {
       resetStudentEntryState();
-      initFirebase();
+      firebaseInitialization = initFirebase();
       renderCustomizers();
       
       // Auto-load auth session if already verified
