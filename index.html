@@ -1597,6 +1597,9 @@
           const docRef = await addDoc(attendancesCollection, record);
           currentStudentSessionId = docRef.id;
           sessionStorage.setItem(STUDENT_SESSION_KEY, docRef.id);
+          if (!studentsList.some(student => student.id === docRef.id)) {
+            studentsList.push({ ...record, id: docRef.id, createdAt: new Date() });
+          }
         } else {
           const mockId = 'mem_' + Date.now();
           currentStudentSessionId = mockId;
@@ -1606,7 +1609,6 @@
           renderLobbyStage();
         }
 
-        document.getElementById('studentFormCard').classList.add('hidden');
         document.getElementById('studentAvatarImg').src = avatarUrl;
         document.getElementById('studentNameDisplay').innerText = name;
 
@@ -1631,7 +1633,6 @@
       if (form) form.reset();
       document.getElementById('studentFormCard').classList.remove('hidden');
       document.getElementById('studentWaitingCard').classList.add('hidden');
-      document.getElementById('studentCountdownCard').classList.add('hidden');
       document.getElementById('studentQuizController').classList.add('hidden');
       document.getElementById('studentAnswerSubmittedCard').classList.add('hidden');
       document.getElementById('studentResultCard').classList.add('hidden');
