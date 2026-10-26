@@ -223,7 +223,7 @@
           </div>
           <div>
             <h1 class="font-black text-lg text-white font-kahoot tracking-wide leading-none flex items-center gap-2">
-              Kahoot! Quiz <span id="gamePhaseBadge" class="text-xs font-normal text-amber-300 bg-amber-400/20 border border-amber-400/30 px-2.5 py-0.5 rounded-full hidden sm:inline-block">Lobby Presensi 🟢</span>
+              Kahoot versi Falwan <span id="gamePhaseBadge" class="text-xs font-normal text-amber-300 bg-amber-400/20 border border-amber-400/30 px-2.5 py-0.5 rounded-full hidden sm:inline-block">Lobby Presensi 🟢</span>
             </h1>
             <p class="text-[11px] text-fuchsia-200/80 font-medium hidden md:block">Absensi + Kuis Interaktif Real-Time</p>
           </div>
@@ -545,11 +545,6 @@
           </div>
 
           <div>
-            <label class="block text-xs font-bold text-fuchsia-300 uppercase tracking-wider mb-1">NIM (Opsional)</label>
-            <input type="text" id="joinNimInput" placeholder="Contoh: 21081010100" class="w-full py-2.5 px-4 rounded-xl bg-black/40 border border-white/20 text-white placeholder-slate-500 focus:outline-none focus:border-fuchsia-500 font-mono text-sm transition">
-          </div>
-
-          <div>
             <label class="block text-xs font-bold text-fuchsia-300 uppercase tracking-wider mb-2">Pilih Avatar Vector SVG</label>
             <div id="avatarPickerGrid" class="grid grid-cols-5 gap-2"></div>
           </div>
@@ -704,7 +699,7 @@
 
       <div class="space-y-1">
         <h3 id="modalStudentName" class="text-xl font-black font-kahoot text-white">Budi Santoso</h3>
-        <p id="modalStudentNim" class="text-xs font-mono text-fuchsia-300">NIM: 21081010100</p>
+        <p class="text-xs font-mono text-fuchsia-300">Peserta kuis</p>
       </div>
 
       <div class="grid grid-cols-2 gap-3 pt-2">
@@ -973,7 +968,7 @@
     function hoverAvatarSound() { playSound('boing'); }
 
     function startLobbyMusic() {
-      if (!audioEnabled || currentRole !== 'lecturer' || gameState !== 'LOBBY' || !lobbyMusic.paused) return;
+      if (!audioEnabled || !currentRole || gameState !== 'LOBBY' || !lobbyMusic.paused) return;
 
       const playback = lobbyMusic.play();
       if (playback) {
@@ -1067,7 +1062,6 @@
     }
 
     function selectStudentRole() {
-      stopLobbyMusic();
       currentRole = 'student';
       document.getElementById('roleLockModal').classList.add('hidden');
       document.getElementById('currentRoleBadge').innerText = "🎓 Mode Mahasiswa";
@@ -1075,6 +1069,7 @@
       document.getElementById('viewStudent').classList.remove('hidden');
       updateStudentViewForPhase();
       playSound('pop');
+      startLobbyMusic();
     }
 
     function showPinStep() {
@@ -1152,7 +1147,6 @@
             docs.push({
               id: docSnap.id,
               name: data.name || '',
-              nim: data.nim || '',
               avatar: data.avatar || AVATAR_OPTIONS[0].url,
               colorId: data.colorId || 'amber',
               isSpotlight: data.isSpotlight || false,
@@ -1532,11 +1526,9 @@
     async function handleStudentJoin(e) {
       e.preventDefault();
       const nameInput = document.getElementById('joinNameInput');
-      const nimInput = document.getElementById('joinNimInput');
       const btn = document.getElementById('joinSubmitBtn');
 
       const name = nameInput.value.trim();
-      const nim = nimInput.value.trim();
       if (!name) return;
 
       btn.disabled = true;
@@ -1546,7 +1538,6 @@
 
       const record = {
         name: name,
-        nim: nim,
         avatar: avatarUrl,
         colorId: selectedColor.id,
         isSpotlight: false,
@@ -1597,13 +1588,11 @@
     function simulateStudentJoin() {
       const names = ['Andi Wijaya', 'Siti Rahma', 'Rian Hidayat', 'Dian Permata', 'Eko Prasetyo', 'Maya Putri'];
       const randomName = names[Math.floor(Math.random() * names.length)] + ' ' + Math.floor(Math.random() * 90 + 10);
-      const randomNim = '21' + Math.floor(10000000 + Math.random() * 90000000);
       const randomAvatar = AVATAR_OPTIONS[Math.floor(Math.random() * AVATAR_OPTIONS.length)];
       const randomColor = COLOR_OPTIONS[Math.floor(Math.random() * COLOR_OPTIONS.length)];
 
       const record = {
         name: randomName,
-        nim: randomNim,
         avatar: randomAvatar.url,
         colorId: randomColor.id,
         isSpotlight: false,
@@ -1670,7 +1659,7 @@
                 ${escapeHtml(st.name)}
               </p>
               <p class="text-[10px] font-mono text-slate-400 truncate">
-                ${escapeHtml(st.nim || 'Hadir')}
+                Peserta kuis
               </p>
             </div>
 
@@ -1760,7 +1749,6 @@
       selectedStudentIdForModal = studentId;
       document.getElementById('modalAvatarImg').src = getAvatarUrl(student.avatar);
       document.getElementById('modalStudentName').innerText = student.name;
-      document.getElementById('modalStudentNim').innerText = student.nim ? `NIM: ${student.nim}` : 'Mahasiswa';
 
       const spotlightBtn = document.getElementById('spotlightBtn');
       spotlightBtn.innerText = student.isSpotlight ? '⭐ Hapus Sorotan' : '⭐ Sorot';
