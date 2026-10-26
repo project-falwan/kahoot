@@ -533,7 +533,7 @@
           <p class="text-xs text-slate-400">Buat avatarmu dan siap menjawab kuis di HP!</p>
         </div>
 
-        <form id="studentJoinForm" onsubmit="handleStudentJoin(event)" class="space-y-4">
+        <form id="studentJoinForm" autocomplete="off" onsubmit="handleStudentJoin(event)" class="space-y-4">
           <div>
             <label class="block text-xs font-bold text-fuchsia-300 uppercase tracking-wider mb-1">PIN Game / Room</label>
             <input type="text" id="joinPinInput" value="778-902" required class="w-full text-center font-black font-mono text-xl py-3 px-4 rounded-xl bg-black/40 border border-white/20 text-amber-300 focus:outline-none focus:border-fuchsia-500 transition">
@@ -541,7 +541,7 @@
 
           <div>
             <label class="block text-xs font-bold text-fuchsia-300 uppercase tracking-wider mb-1">Nama Mahasiswa <span class="text-rose-400">*</span></label>
-            <input type="text" id="joinNameInput" required placeholder="Contoh: Budi Santoso" class="w-full py-3 px-4 rounded-xl bg-black/40 border border-white/20 text-white placeholder-slate-500 focus:outline-none focus:border-fuchsia-500 font-semibold transition">
+            <input type="text" id="joinNameInput" autocomplete="off" required placeholder="Contoh: Budi Santoso" class="w-full py-3 px-4 rounded-xl bg-black/40 border border-white/20 text-white placeholder-slate-500 focus:outline-none focus:border-fuchsia-500 font-semibold transition">
           </div>
 
           <div>
@@ -571,7 +571,7 @@
           <span class="inline-block px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold font-mono">
             ✓ Terhubung Ke Room
           </span>
-          <h2 id="studentNameDisplay" class="text-2xl font-black font-kahoot text-white">Budi Santoso</h2>
+          <h2 id="studentNameDisplay" class="text-2xl font-black font-kahoot text-white"></h2>
           <p class="text-xs text-fuchsia-300">Siap-siap! Kuis akan muncul di layar ini secara otomatis.</p>
         </div>
 
@@ -698,7 +698,7 @@
       </div>
 
       <div class="space-y-1">
-        <h3 id="modalStudentName" class="text-xl font-black font-kahoot text-white">Budi Santoso</h3>
+        <h3 id="modalStudentName" class="text-xl font-black font-kahoot text-white"></h3>
         <p class="text-xs font-mono text-fuchsia-300">Peserta kuis</p>
       </div>
 
@@ -823,12 +823,14 @@
     let currentRole = null; // 'student' | 'lecturer'
     let isPartyMode = false;
     let currentStudentSessionId = null;
+    const STUDENT_SESSION_KEY = 'kahoot_student_session_id';
 
     // GAME QUIZ ENGINE STATE
     let gameState = 'LOBBY'; 
     let currentQuestionIndex = 0;
     let timerSeconds = 20;
     let timerInterval = null;
+    let activeQuestionIndex = null;
     let questionStartTime = 0;
 
     // Quiz Questions Bank
@@ -1130,11 +1132,24 @@
         attendancesCollection = collection(db, 'artifacts', appId, 'public', 'data', 'attendances');
         gameStateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameSession', 'roomControl');
 
+        await removePreviousStudentSession();
         setupRealtimeListener();
         isFirebaseReady = true;
       } catch (err) {
         console.warn("Firestore fallback to local memory state:", err);
         isFirebaseReady = false;
+      }
+    }
+
+    async function removePreviousStudentSession() {
+      const previousSessionId = sessionStorage.getItem(STUDENT_SESSION_KEY);
+      if (!previousSessionId || !attendancesCollection) return;
+
+      try {
+        await deleteDoc(doc(attendancesCollection, previousSessionId));
+        sessionStorage.removeItem(STUDENT_SESSION_KEY);
+      } catch (err) {
+        console.error('Gagal membersihkan profil mahasiswa sesi sebelumnya:', err);
       }
     }
 
@@ -1215,6 +1230,14 @@
     }
 
     function applyGameStateLocally(newState) {
+      if (newState !== 'QUESTION') {
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = null;
+        activeQuestionIndex = null;
+        countdownAudio.pause();
+        countdownAudio.currentTime = 0;
+      }
+
       gameState = newState;
       if (newState === 'LOBBY') startLobbyMusic();
       else stopLobbyMusic();
@@ -1292,6 +1315,9 @@
 
     // 1. QUESTION PHASE LOGIC (WITH RESET PREVIOUS ANSWERS BUG FIX)
     async function setupQuestionStage() {
+      if (activeQuestionIndex === currentQuestionIndex) return;
+
+      activeQuestionIndex = currentQuestionIndex;
       const q = quizQuestions[currentQuestionIndex];
       document.getElementById('questionNumberBadge').innerText = `SOAL ${currentQuestionIndex + 1} DARI ${quizQuestions.length}`;
       document.getElementById('hostQuestionTitle').innerText = q.question;
@@ -1299,6 +1325,9 @@
       document.getElementById('hostOpt1').innerText = `B. ${q.options[1]}`;
       document.getElementById('hostOpt2').innerText = `C. ${q.options[2]}`;
       document.getElementById('hostOpt3').innerText = `D. ${q.options[3]}`;
+      timerSeconds = q.timeLimit || 20;
+      document.getElementById('questionTimerDisplay').innerText = timerSeconds;
+      playCountdownSound();
 
       // 🚨 CRITICAL FIX: RESET LAST ANSWER SO STUDENTS DON'T AUTO-ANSWER PREVIOUS SELECTION
       studentsList.forEach(s => {
@@ -1321,6 +1350,8 @@
         }
       }
 
+      if (gameState !== 'QUESTION' || activeQuestionIndex !== currentQuestionIndex) return;
+
       timerSeconds = q.timeLimit || 20;
       document.getElementById('questionTimerDisplay').innerText = timerSeconds;
       questionStartTime = Date.now();
@@ -1332,10 +1363,10 @@
       timerInterval = setInterval(() => {
         timerSeconds--;
         document.getElementById('questionTimerDisplay').innerText = timerSeconds;
-        if (timerSeconds <= 5 && timerSeconds > 0) playCountdownSound();
 
         if (timerSeconds <= 0) {
           clearInterval(timerInterval);
+          timerInterval = null;
           setGameState('RESULT');
         }
       }, 1000);
@@ -1450,6 +1481,7 @@
     function updateStudentViewForPhase() {
       if (currentRole !== 'student') return;
 
+      const studentFormCard = document.getElementById('studentFormCard');
       const studentWaitingCard = document.getElementById('studentWaitingCard');
       const studentQuizController = document.getElementById('studentQuizController');
       const studentAnswerSubmittedCard = document.getElementById('studentAnswerSubmittedCard');
@@ -1459,10 +1491,17 @@
 
       [studentWaitingCard, studentQuizController, studentAnswerSubmittedCard, studentResultCard].forEach(el => el.classList.add('hidden'));
 
+      const me = getCurrentStudent();
+      if (!me) {
+        studentFormCard.classList.remove('hidden');
+        return;
+      }
+
+      studentFormCard.classList.add('hidden');
+
       if (gameState === 'LOBBY') {
         studentWaitingCard.classList.remove('hidden');
       } else if (gameState === 'QUESTION') {
-        const me = getCurrentStudent();
         if (me && me.lastAnswerIndex !== null && me.lastAnswerIndex !== undefined) {
           studentAnswerSubmittedCard.classList.remove('hidden');
         } else {
@@ -1472,7 +1511,6 @@
         }
       } else if (gameState === 'RESULT' || gameState === 'LEADERBOARD' || gameState === 'PODIUM') {
         studentResultCard.classList.remove('hidden');
-        const me = getCurrentStudent();
         const q = quizQuestions[currentQuestionIndex];
 
         if (me && me.lastAnswerIndex === q.correctIndex) {
@@ -1493,7 +1531,8 @@
     }
 
     function getCurrentStudent() {
-      return studentsList.find(s => s.id === currentStudentSessionId) || studentsList[0];
+      if (!currentStudentSessionId) return null;
+      return studentsList.find(s => s.id === currentStudentSessionId) || null;
     }
 
     async function submitStudentAnswer(optionIndex) {
@@ -1557,6 +1596,7 @@
         if (isFirebaseReady && attendancesCollection) {
           const docRef = await addDoc(attendancesCollection, record);
           currentStudentSessionId = docRef.id;
+          sessionStorage.setItem(STUDENT_SESSION_KEY, docRef.id);
         } else {
           const mockId = 'mem_' + Date.now();
           currentStudentSessionId = mockId;
@@ -1583,6 +1623,20 @@
     function resetStudentForm() {
       document.getElementById('studentWaitingCard').classList.add('hidden');
       document.getElementById('studentFormCard').classList.remove('hidden');
+    }
+
+    function resetStudentEntryState() {
+      currentStudentSessionId = null;
+      const form = document.getElementById('studentJoinForm');
+      if (form) form.reset();
+      document.getElementById('studentFormCard').classList.remove('hidden');
+      document.getElementById('studentWaitingCard').classList.add('hidden');
+      document.getElementById('studentCountdownCard').classList.add('hidden');
+      document.getElementById('studentQuizController').classList.add('hidden');
+      document.getElementById('studentAnswerSubmittedCard').classList.add('hidden');
+      document.getElementById('studentResultCard').classList.add('hidden');
+      document.getElementById('studentNameDisplay').innerText = '';
+      document.getElementById('studentAvatarImg').removeAttribute('src');
     }
 
     function simulateStudentJoin() {
@@ -1864,6 +1918,7 @@
 
     // App Initialization
     window.addEventListener('DOMContentLoaded', () => {
+      resetStudentEntryState();
       initFirebase();
       renderCustomizers();
       
